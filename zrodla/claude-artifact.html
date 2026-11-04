@@ -1,0 +1,714 @@
+<title>Zarządzanie gospodarstwem</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=Source+Sans+3:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: zakładki u góry jak przegródki segregatora polowego; pod nimi jedna robocza tabela na całą szerokość + panel edycji wysuwany z prawej. */
+:root {
+  --bg: #f3f5ef;
+  --surface: #ffffff;
+  --ink: #1d2419;
+  --muted: #5d6857;
+  --line: #d9dfd2;
+  --accent: #3d6b2a;       /* zieleń łanu */
+  --accent-ink: #ffffff;
+  --soil: #7a5531;         /* brąz gleby */
+  --warn-bg: #fff1c9; --warn-ink: #7a5600;
+  --bad-bg: #ffe0dc; --bad-ink: #9c2414;
+  --ok-bg: #e2f1d8; --ok-ink: #2c5a1a;
+  --c0: #e3efd0; --c1: #fbe7b5; --c2: #d8e7f3; --c3: #f3d9cf; --c4: #e5dcf1; --c5: #d4ece6; --c6: #efe3d2; --c7: #f1d7e4;
+  --chip-ink: #2a2f25;
+  --f-display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "Source Sans 3", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-data: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #141811; --surface: #1c2218; --ink: #e6ebdf; --muted: #9ea896; --line: #2f382a;
+  --accent: #8fc46b; --accent-ink: #11180c; --soil: #d2a273;
+  --warn-bg: #3d3210; --warn-ink: #f3d27a; --bad-bg: #44201a; --bad-ink: #ffb4a6; --ok-bg: #22361a; --ok-ink: #b5e09a;
+  --c0: #2f4223; --c1: #4a3d17; --c2: #1f3546; --c3: #4a2b22; --c4: #352a48; --c5: #1d3f37; --c6: #443624; --c7: #47263a;
+  --chip-ink: #eef2e8; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #141811; --surface: #1c2218; --ink: #e6ebdf; --muted: #9ea896; --line: #2f382a;
+  --accent: #8fc46b; --accent-ink: #11180c; --soil: #d2a273;
+  --warn-bg: #3d3210; --warn-ink: #f3d27a; --bad-bg: #44201a; --bad-ink: #ffb4a6; --ok-bg: #22361a; --ok-ink: #b5e09a;
+  --c0: #2f4223; --c1: #4a3d17; --c2: #1f3546; --c3: #4a2b22; --c4: #352a48; --c5: #1d3f37; --c6: #443624; --c7: #47263a;
+  --chip-ink: #eef2e8; color-scheme: dark }
+
+* { box-sizing: border-box }
+[hidden] { display: none !important }
+body { background: var(--bg); color: var(--ink); font: 15px/1.45 var(--f-body); }
+.wrap { max-width: 1280px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 48px; display: grid; gap: 18px; }
+header.top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px 24px; }
+.brand h1 { font: 800 clamp(24px, 4vw, 34px)/1.05 var(--f-display); font-stretch: 80%; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+.brand p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+.quick { display: flex; gap: 8px; flex-wrap: wrap; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.yearbox { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.yearbox label { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+select, input, textarea { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 7px 9px; min-width: 0; }
+select:focus-visible, input:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible, .cell:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+#rok { font: 700 17px var(--f-data); padding: 6px 10px; }
+
+nav.tabs { display: flex; gap: 2px; overflow-x: auto; border-bottom: 2px solid var(--ink); scrollbar-width: none; }
+nav.tabs a { flex: none; text-decoration: none; color: var(--muted); font: 700 15px var(--f-display); font-stretch: 85%; text-transform: uppercase; letter-spacing: .04em; padding: 10px 16px 8px; border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0; }
+nav.tabs a:hover { color: var(--ink); }
+nav.tabs a[aria-current="page"] { background: var(--ink); color: var(--bg); }
+
+.stats { display: flex; flex-wrap: wrap; gap: 10px 28px; }
+.stat { display: grid; gap: 0; }
+.stat b { font: 600 22px var(--f-data); font-variant-numeric: tabular-nums; }
+.stat span { font-size: 12px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.toolbar .grow { flex: 1 1 200px; }
+button { font: 600 14px var(--f-body); border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 7px 12px; cursor: pointer; }
+button:hover { border-color: var(--muted); }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button.danger { color: var(--bad-ink); }
+button.danger.armed { background: var(--bad-ink); color: var(--surface); border-color: var(--bad-ink); }
+button:disabled { opacity: .5; cursor: not-allowed; }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { padding: 7px 10px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; vertical-align: middle; }
+th { font: 600 11px var(--f-body); text-transform: uppercase; letter-spacing: .07em; color: var(--muted); background: var(--surface); position: sticky; top: 0; }
+td.num, th.num { text-align: right; font-family: var(--f-data); font-variant-numeric: tabular-nums; font-size: 13px; }
+td.wrap { max-width: 300px; overflow: hidden; text-overflow: ellipsis; color: var(--muted); font-size: 13px; }
+tbody tr.click { cursor: pointer; }
+tbody tr.click:hover { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+tfoot td { font-weight: 700; border-bottom: 0; }
+.pole { font-weight: 700; }
+.sortbtn { all: unset; cursor: pointer; display: inline-flex; gap: 4px; align-items: center; font: inherit; color: inherit; text-transform: inherit; letter-spacing: inherit; }
+.sortbtn:hover, .sortbtn.on { color: var(--ink); }
+.sortbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+.sortbtn .arr { font-size: 9px; opacity: .45; }
+.sortbtn.on .arr { opacity: 1; color: var(--accent); }
+.sub { color: var(--muted); font-size: 12px; }
+.chip { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 13px; font-weight: 600; color: var(--chip-ink); background: var(--c0); }
+.pill { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.pill.plan { background: var(--c2); color: var(--chip-ink); }
+.pill.trwa { background: var(--warn-bg); color: var(--warn-ink); }
+.pill.done { background: var(--ok-bg); color: var(--ok-ink); }
+.pill.bad { background: var(--bad-bg); color: var(--bad-ink); }
+.empty { color: var(--muted); font-style: italic; }
+
+/* Płodozmian */
+.grid-rot td.cell { padding: 4px; min-width: 132px; }
+.grid-rot .cell > div { padding: 6px 8px; border-radius: 5px; min-height: 34px; font-size: 13px; font-weight: 600; color: var(--chip-ink); }
+.grid-rot .cell .none { background: transparent; border: 1px dashed var(--line); color: var(--muted); font-weight: 400; }
+.grid-rot .cell.repeat > div { box-shadow: inset 0 0 0 2px var(--warn-ink); }
+.grid-rot th.cur { color: var(--ink); }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 14px; font-size: 13px; color: var(--muted); padding: 10px 12px; }
+
+/* Struktura zasiewów */
+.struct { display: grid; gap: 8px; padding: 14px; }
+.bar { display: flex; height: 26px; border-radius: 5px; overflow: hidden; }
+.bar > div { min-width: 2px; }
+.keys { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; }
+.keys i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.note { font-size: 13px; color: var(--muted); padding: 0 14px 14px; max-width: 75ch; }
+
+/* Panel edycji */
+.drawer-bg { position: fixed; inset: 0; background: color-mix(in srgb, var(--ink) 35%, transparent); z-index: 20; }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(480px, 100%); background: var(--surface); border-left: 1px solid var(--line); z-index: 21; display: grid; grid-template-rows: auto 1fr auto; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); padding-right: env(safe-area-inset-right, 0px); }
+.drawer header { padding: 16px 18px 10px; border-bottom: 1px solid var(--line); }
+.drawer h2 { margin: 0; font: 800 22px var(--f-display); font-stretch: 85%; }
+.drawer .body { overflow-y: auto; padding: 14px 18px; display: grid; gap: 12px; align-content: start; }
+.drawer footer { padding: 12px 18px; border-top: 1px solid var(--line); display: flex; gap: 8px; flex-wrap: wrap; }
+.drawer footer .sp { flex: 1; }
+.f { display: grid; gap: 4px; }
+.f label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.f .hint { font-size: 12px; color: var(--muted); }
+.ros-head, .ros-row { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) 70px 30px; gap: 6px; align-items: center; }
+.ros-head span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.ros-del { padding: 4px 0; font-size: 16px; line-height: 1; color: var(--muted); }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.checks { display: grid; gap: 10px; max-height: 360px; overflow-y: auto; border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; }
+.grp { display: grid; gap: 4px; }
+.grp + .grp { border-top: 1px solid var(--line); padding-top: 8px; }
+.checks label.grp-h { font-weight: 600; }
+.grp-b { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 2px 10px; padding-left: 22px; }
+.checks label { font-size: 14px; text-transform: none; letter-spacing: 0; color: var(--ink); font-weight: 400; display: flex; gap: 6px; align-items: center; }
+.err { color: var(--bad-ink); font-size: 13px; }
+#status { font-size: 13px; color: var(--muted); }
+#status.bad { color: var(--bad-ink); }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 8px 16px; border-radius: 6px; font-weight: 600; z-index: 30; }
+@media (max-width: 560px) { .row3 { grid-template-columns: 1fr 1fr; } th, td { padding: 6px 8px; } }
+@media (prefers-reduced-motion: no-preference) { .drawer { animation: slide .18s ease-out; } @keyframes slide { from { transform: translateX(24px); opacity: .6 } } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1>Zarządzanie gospodarstwem</h1>
+      <p>Pola, uprawy i zabiegi agrotechniczne według sezonów</p>
+    </div>
+    <div class="actions">
+      <div class="quick" id="quick" hidden>
+        <button class="primary" data-act="new-pole">+ Nowe pole</button>
+        <button data-act="new-zab">+ Nowy zabieg</button>
+      </div>
+      <div class="yearbox">
+        <label for="rok">Sezon</label>
+        <select id="rok"></select>
+      </div>
+    </div>
+  </header>
+
+  <nav class="tabs" aria-label="Widoki">
+    <a href="#pola" data-view="pola">Pola</a>
+    <a href="#uprawy" data-view="uprawy">Uprawy</a>
+    <a href="#zabiegi" data-view="zabiegi">Zabiegi</a>
+    <a href="#plodozmian" data-view="plodozmian">Płodozmian</a>
+    <a href="#podsumowanie" data-view="podsumowanie">Podsumowanie</a>
+  </nav>
+
+  <div id="status" role="status">Wczytywanie danych gospodarstwa…</div>
+  <main id="view"></main>
+</div>
+
+<div id="drawer-root"></div>
+<div id="toast-root"></div>
+
+<script>
+(() => {
+"use strict";
+const UPRAWY = ["Pszenica ozima","Pszenica jara","Pszenżyto ozime","Pszenżyto jare","Żyto ozime","Jęczmień ozimy","Jęczmień jary","Owies","Mieszanka zbożowa","Rzepak ozimy","Kukurydza","Kukurydza na ziarno","Kukurydza na kiszonkę","Burak cukrowy","Ziemniaki","Groch","Bobik","Łubin","Soja","Lucerna siewna","Koniczyna","TUZ (regularnie odnawiane)","Mieszanki traw na gruntach ornych","Trawy na gruntach ornych","Międzyplon","Ugór","Inna"];
+const TYPY = ["Herbicyd","Fungicyd","Insektycyd","Adiuwant","Regulator wzrostu","Desykant","Nasiona","Nawóz mineralny stały","Nawóz mineralny płynny","Nawóz dolistny","Nawóz dolistny, Nawóz mineralny stały","Nawóz naturalny płynny","Obornik ściółkowy","Wapno","Inny"];
+const RODZAJE = ["Oprysk","Nawożenie","Rozlewanie gnojowicy/gnojówki/pofermentu","Rozrzucanie obornika","Wapnowanie","Siew uprawy głównej","Siew agregatem uprawowo-siewnym","Siew międzyplonu","Sadzenie","Orka","Podorywka","Uprawa kultywatorem zębowym","Uprawa przedsiewna","Bronowanie","Wałowanie","Koszenie","Zbiór","Zaprawianie","Analiza gleby","Inny"];
+// Nawóz naturalny (do limitu 170 kg N/ha): rozpoznawany po rodzaju, typie albo nazwie środka
+const isOrganic = z => /naturaln|obornik|gnojow|gnojówk|gonojow|poferment/i.test([z.rodzaj, z.typ, z.srodek].join(" ")) || z.rodzaj === "Nawożenie organiczne";
+const JEDN = ["kg","t","l","m³","szt.","j.s.","ha"];
+const STATUS = ["Plan","W trakcie","Zrealizowane"];
+const N_ORG_LIMIT = 170;
+
+const S = { pola: new Map(), uprawy: new Map(), zabiegi: new Map(), loaded: { pola:false, uprawy:false, zabiegi:false }, canWrite: true, rok: null, view: "pola", f: { pole:"", rodzaj:"", q:"" } };
+let db = null, downloads = null;
+const $ = (s, el = document) => el.querySelector(s);
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+const nf = (d) => new Intl.NumberFormat("pl-PL", { maximumFractionDigits: d, minimumFractionDigits: 0 });
+const fmt = (v, d = 2) => (v === null || v === undefined || v === "" || isNaN(v)) ? "" : nf(d).format(v);
+const zl = v => (v ? nf(0).format(Math.round(v)) + " zł" : "–");
+const num = v => { if (v === "" || v === null || v === undefined) return null; const n = parseFloat(String(v).replace(/\s/g, "").replace(",", ".")); return isNaN(n) ? null : n; };
+const dPL = s => s ? s.split("-").reverse().join(".") : "";
+const slug = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/ł/g, "l").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "pole";
+
+const HUES = [[/^(TUZ|Trawy|Mieszanki traw)/, 0], [/^Kukurydza/, 1], [/^(Jęczmień|Owies|Mieszanka)/, 2], [/^(Pszenica|Burak|Ziemniaki)/, 3], [/^Rzepak/, 4], [/^(Lucerna|Koniczyna|Groch|Bobik|Łubin|Soja)/, 5], [/^Pszenżyto/, 6], [/^Żyto/, 7]];
+function hue(name) { if (!name) return "transparent"; const m = HUES.find(([re]) => re.test(name)); if (m) return `var(--c${m[1]})`; let b = 0; for (const c of name) b = (b * 31 + c.charCodeAt(0)) >>> 0; return `var(--c${b % 8})`; }
+const chip = name => name ? `<span class="chip" style="background:${hue(name)}">${esc(name)}</span>` : `<span class="empty">brak</span>`;
+const statusPill = s => s ? `<span class="pill ${s === "Plan" ? "plan" : s === "Zrealizowane" ? "done" : "trwa"}">${esc(s)}</span>` : "";
+
+/* ---------- dane pochodne ---------- */
+const polaSorted = () => [...S.pola.entries()].sort((a, b) => (a[1].nazwa || "").localeCompare(b[1].nazwa || "", "pl", { numeric: true }));
+const poleName = id => S.pola.get(id)?.nazwa || id;
+const poleHa = id => num(S.pola.get(id)?.ha) || 0;
+const sez = r => `${r - 1}/${r}`;
+const upr = (poleId, rok) => S.uprawy.get(`${poleId}_${rok}`);
+const zabHa = z => num(z.ha) ?? poleHa(z.pole);
+const zabIlosc = z => (num(z.dawka) ?? 0) * zabHa(z);
+const zabKoszt = z => num(z.cena) ? zabIlosc(z) * num(z.cena) : 0;
+function years() {
+  const ys = new Set();
+  for (const u of S.uprawy.values()) if (u.rok) ys.add(+u.rok);
+  for (const z of S.zabiegi.values()) if (z.rok) ys.add(+z.rok);
+  if (!ys.size) ys.add(new Date().getFullYear());
+  const max = Math.max(...ys), min = Math.min(...ys);
+  const out = []; for (let y = Math.min(min, max - 3); y <= max + 2; y++) out.push(y);
+  return out;
+}
+function sumsFor(poleId, rok) {
+  const r = { koszt: 0, N: 0, P: 0, K: 0, Norg: 0, n: 0 };
+  for (const z of S.zabiegi.values()) {
+    if (z.pole !== poleId || +z.rok !== +rok) continue;
+    r.n++; r.koszt += zabKoszt(z);
+    const share = poleHa(poleId) ? zabHa(z) / poleHa(poleId) : 1; // kg/ha w przeliczeniu na całe pole
+    r.N += (num(z.N) || 0) * share; r.P += (num(z.P) || 0) * share; r.K += (num(z.K) || 0) * share;
+    if (isOrganic(z)) r.Norg += (num(z.N) || 0) * share;
+  }
+  return r;
+}
+
+/* ---------- widoki ---------- */
+function render() {
+  const allLoaded = Object.values(S.loaded).every(Boolean);
+  document.querySelectorAll("nav.tabs a").forEach(a => a.setAttribute("aria-current", a.dataset.view === S.view ? "page" : "false"));
+  const ys = years();
+  if (!S.rok || !ys.includes(S.rok)) { const real = [...S.uprawy.values()].map(u => +u.rok).filter(Boolean); S.rok = real.length ? Math.max(...real) : new Date().getFullYear(); if (!ys.includes(S.rok)) ys.push(S.rok); }
+  const sel = $("#rok"); const want = ys.map(y => `<option value="${y}"${y === S.rok ? " selected" : ""}>${sez(y)}</option>`).join("");
+  if (sel.innerHTML !== want) sel.innerHTML = want;
+  sel.value = S.rok;
+  $("#quick").hidden = !db || !S.canWrite;
+  const v = $("#view");
+  if (allLoaded && !S.pola.size) { v.innerHTML = emptyState(); return; }
+  v.innerHTML = ({ pola: vPola, uprawy: vUprawy, zabiegi: vZabiegi, plodozmian: vPlodozmian, podsumowanie: vPodsum }[S.view] || vPola)();
+}
+function emptyState() {
+  return `<div class="panel" style="padding:24px;display:grid;gap:10px;max-width:60ch">
+    <h2 style="margin:0;font:800 22px var(--f-display)">Nie ma jeszcze żadnych pól</h2>
+    <p style="margin:0;color:var(--muted)">Zacznij od dodania pól gospodarstwa. Potem przypiszesz im uprawy na kolejne lata i będziesz zapisywać zabiegi.</p>
+    <div>${S.canWrite ? `<button class="primary" data-act="new-pole">Dodaj pierwsze pole</button>` : ""}</div></div>`;
+}
+/* ---------- sortowanie tabel ---------- */
+const T = "text", N = "num", D = "date";
+const SORTS = {
+  pola: [
+    { k: "nazwa", l: "Pole", t: T, g: r => r.p.nazwa },
+    { k: "ha", l: "ha", t: N, g: r => num(r.p.ha) },
+    { k: "uprawa", l: () => `Uprawa ${sez(S.rok)}`, t: T, g: r => r.u?.uprawa },
+    { k: "klasa", l: "Klasa", t: T, g: r => r.p.klasa },
+    { k: "ph", l: "pH", t: N, g: r => num(r.p.ph) },
+    { k: "p2o5", l: "P₂O₅ mg/kg", t: N, g: r => num(r.p.p2o5) },
+    { k: "k2o", l: "K₂O mg/kg", t: N, g: r => num(r.p.k2o) },
+    { k: "analiza", l: "Analiza", t: D, g: r => r.p.analiza },
+    { k: "wlasnosc", l: "Własność", t: T, g: r => r.p.wlasnosc },
+    { k: "uwagi", l: "Uwagi" },
+  ],
+  uprawy: [
+    { k: "nazwa", l: "Pole", t: T, g: r => r.p.nazwa },
+    { k: "ha", l: "ha", t: N, g: r => num(r.p.ha) },
+    { k: "uprawa", l: "Uprawa", t: T, g: r => r.u?.uprawa },
+    { k: "odmiana", l: "Odmiana", t: T, g: r => r.u?.odmiana },
+    { k: "przedplon", l: () => `Przedplon ${sez(S.rok - 1)}`, t: T, g: r => r.prev?.uprawa },
+    { k: "status", l: "Status", t: T, g: r => r.u?.status ? STATUS.indexOf(r.u.status) + 1 || 9 : null, n: true },
+    { k: "siew", l: "Siew", t: D, g: r => r.u?.siew },
+    { k: "zbior", l: "Zbiór", t: D, g: r => r.u?.zbior },
+    { k: "plon", l: "Plon t/ha", t: N, g: r => num(r.u?.plon) },
+    { k: "zabiegi", l: "Zabiegi", t: N, g: r => r.s.n || null },
+    { k: "koszt", l: "Koszt", t: N, g: r => r.s.koszt || null },
+    { k: "uwagi", l: "Uwagi" },
+  ],
+  zabiegi: [
+    { k: "data", l: "Data", t: D, g: r => r.z.data },
+    { k: "pole", l: "Pole", t: T, g: r => poleName(r.z.pole) },
+    { k: "uprawa", l: "Uprawa", t: T, g: r => upr(r.z.pole, r.z.rok)?.uprawa, hide: true },
+    { k: "rodzaj", l: "Rodzaj", t: T, g: r => r.z.rodzaj },
+    { k: "srodek", l: "Środek / nawóz", t: T, g: r => r.z.srodek },
+    { k: "typ", l: "Typ środka", t: T, g: r => r.z.typ, hide: true },
+    { k: "dawka", l: "Dawka/ha", t: N, g: r => num(r.z.dawka) },
+    { k: "ha", l: "ha", t: N, g: r => zabHa(r.z) },
+    { k: "ilosc", l: "Ilość", t: N, g: r => r.z.dawka ? zabIlosc(r.z) : null },
+    { k: "koszt", l: "Koszt", t: N, g: r => zabKoszt(r.z) || null },
+    { k: "N", l: "N kg/ha", t: N, g: r => num(r.z.N) },
+    { k: "uwagi", l: "Uwagi" },
+  ],
+  podsum: [
+    { k: "nazwa", l: "Pole", t: T, g: r => r.p.nazwa },
+    { k: "uprawa", l: "Uprawa", t: T, g: r => r.u?.uprawa },
+    { k: "ha", l: "ha", t: N, g: r => num(r.p.ha) },
+    { k: "N", l: "N kg/ha", t: N, g: r => r.s.N },
+    { k: "P", l: "P₂O₅ kg/ha", t: N, g: r => r.s.P },
+    { k: "K", l: "K₂O kg/ha", t: N, g: r => r.s.K },
+    { k: "Norg", l: "N nat. kg/ha", t: N, g: r => r.s.Norg },
+    { k: "koszt", l: "Koszt", t: N, g: r => r.s.koszt || null },
+    { k: "zlha", l: "zł/ha", t: N, g: r => r.s.koszt && num(r.p.ha) ? r.s.koszt / num(r.p.ha) : null },
+  ],
+};
+let sorts = { pola: { key: "nazwa", dir: 1 }, uprawy: { key: "nazwa", dir: 1 }, zabiegi: { key: "data", dir: -1 }, podsum: { key: "nazwa", dir: 1 } };
+try { const v = JSON.parse(localStorage.getItem("sorts") || "null"); if (v) for (const k in sorts) if (v[k] && SORTS[k].some(c => c.k === v[k].key && c.g)) sorts[k] = v[k]; } catch (_) {}
+try { const o = JSON.parse(localStorage.getItem("polaSort") || "null"); if (o && !localStorage.getItem("sorts") && SORTS.pola.some(c => c.k === o.key)) sorts.pola = o; } catch (_) {}
+const lbl = c => typeof c.l === "function" ? c.l() : c.l;
+function setSort(view, key, dir) {
+  const cur = sorts[view]; sorts[view] = { key, dir: dir ?? (cur.key === key ? -cur.dir : 1) };
+  try { localStorage.setItem("sorts", JSON.stringify(sorts)); } catch (_) {}
+  render();
+}
+function baseRows() {
+  return polaSorted().map(([id, p]) => ({ id, p, u: upr(id, S.rok), prev: upr(id, S.rok - 1), s: sumsFor(id, S.rok) }));
+}
+function sortRows(view, rows) {
+  const st = sorts[view]; const col = SORTS[view].find(c => c.k === st.key && c.g) || SORTS[view][0];
+  const isEmpty = v => v === null || v === undefined || v === "";
+  return rows.slice().sort((a, b) => {
+    const x = col.g(a), y = col.g(b), ex = isEmpty(x), ey = isEmpty(y);
+    if (ex || ey) return ex === ey ? 0 : ex ? 1 : -1;            // puste zawsze na końcu
+    const c = typeof x === "number" ? x - y : String(x).localeCompare(String(y), "pl", { numeric: true });
+    return c * st.dir;
+  });   // sort stabilny: przy remisie zostaje kolejność alfabetyczna pól
+}
+function theadHtml(view) {
+  const st = sorts[view];
+  return SORTS[view].filter(c => !c.hide).map(c => { const cls = c.t === N && !c.n ? "num" : "";
+    if (!c.g) return `<th class="${cls}">${lbl(c)}</th>`;
+    const on = st.key === c.k;
+    return `<th class="${cls}" aria-sort="${on ? (st.dir > 0 ? "ascending" : "descending") : "none"}"><button type="button" class="sortbtn${on ? " on" : ""}" data-sortview="${view}" data-sort="${c.k}">${lbl(c)}<span class="arr">${on ? (st.dir > 0 ? "▲" : "▼") : "↕"}</span></button></th>`; }).join("");
+}
+function sortSelect(view) {
+  const st = sorts[view];
+  const opts = SORTS[view].filter(c => c.g).flatMap(c => [1, -1].map(d => {
+    const dirTxt = c.k === "status" ? (d > 0 ? "plan → zrealizowane" : "zrealizowane → plan") : c.t === N ? (d > 0 ? "rosnąco" : "malejąco") : c.t === D ? (d > 0 ? "najstarsza" : "najnowsza") : (d > 0 ? "A–Z" : "Z–A");
+    return `<option value="${c.k}:${d}"${st.key === c.k && st.dir === d ? " selected" : ""}>${lbl(c)}: ${dirTxt}</option>`; })).join("");
+  return `<label for="sort-${view}" class="sub">Sortuj</label><select id="sort-${view}" data-sortsel="${view}">${opts}</select>`;
+}
+function vPola() {
+  const rows = sortRows("pola", baseRows()); let tot = 0;
+  const body = rows.map(({ id, p, u }) => { tot += num(p.ha) || 0;
+    return `<tr class="click" data-act="edit-pole" data-id="${esc(id)}">
+      <td class="pole">${esc(p.nazwa)}<div class="sub">dz. ${esc(p.dzialki || "–")}</div></td>
+      <td class="num">${fmt(num(p.ha))}</td>
+      <td>${chip(u?.uprawa)}</td>
+      <td>${esc(p.klasa || "")}</td>
+      <td class="num">${fmt(num(p.ph), 1)}</td>
+      <td class="num">${fmt(num(p.p2o5), 1)}</td>
+      <td class="num">${fmt(num(p.k2o), 1)}</td>
+      <td>${dPL(p.analiza)}</td>
+      <td>${esc(p.wlasnosc || "")}</td>
+      <td class="wrap" title="${esc(p.uwagi || "")}">${esc(p.uwagi || "")}</td></tr>`; }).join("");
+  return `<div style="display:grid;gap:14px">
+    <div class="stats"><div class="stat"><b>${rows.length}</b><span>pól</span></div><div class="stat"><b>${fmt(tot)} ha</b><span>powierzchnia</span></div></div>
+    <div class="toolbar">${sortSelect("pola")}<div class="grow"></div>${S.canWrite ? `<button class="primary" data-act="new-pole">Dodaj pole</button>` : ""}</div>
+    <div class="panel scroll"><table><thead><tr>${theadHtml("pola")}</tr></thead>
+    <tbody>${body}</tbody><tfoot><tr><td>Razem</td><td class="num">${fmt(tot)}</td><td colspan="8"></td></tr></tfoot></table></div></div>`;
+}
+function vUprawy() {
+  const rok = S.rok; let haPl = 0, haAll = 0;
+  const rows = sortRows("uprawy", baseRows());
+  const body = rows.map(({ id, p, u, prev, s }) => {
+    haAll += num(p.ha) || 0; if (u?.uprawa) haPl += num(p.ha) || 0;
+    const rep = u?.uprawa && prev?.uprawa && u.uprawa === prev.uprawa && !/TUZ|Trawy|traw|Lucerna|Koniczyna/.test(u.uprawa);
+    return `<tr class="click" data-act="edit-upr" data-pole="${esc(id)}" data-rok="${rok}">
+      <td class="pole">${esc(p.nazwa)}</td><td class="num">${fmt(num(p.ha))}</td>
+      <td>${chip(u?.uprawa)}${rep ? ` <span class="pill bad" title="Ta sama uprawa co w poprzednim sezonie">po sobie</span>` : ""}</td>
+      <td>${esc(u?.odmiana || "")}</td><td>${prev?.uprawa ? esc(prev.uprawa) : `<span class="empty">–</span>`}</td>
+      <td>${statusPill(u?.status)}</td><td>${dPL(u?.siew)}</td><td>${dPL(u?.zbior)}</td>
+      <td class="num">${fmt(num(u?.plon))}</td><td class="num">${s.n || ""}</td><td class="num">${s.koszt ? zl(s.koszt) : ""}</td>
+      <td class="wrap" title="${esc(u?.uwagi || "")}">${esc(u?.uwagi || "")}</td></tr>`; }).join("");
+  return `<div style="display:grid;gap:14px">
+    <div class="stats"><div class="stat"><b>${fmt(haPl)} / ${fmt(haAll)} ha</b><span>obsadzone w sezonie ${sez(rok)}</span></div></div>
+    <p class="sub" style="margin:0">Kliknij pole, aby wpisać lub zmienić uprawę w sezonie ${sez(rok)}. Oziminy siane jesienią ${rok - 1} należą do sezonu ${sez(rok)}.</p>
+    <div class="toolbar">${sortSelect("uprawy")}</div>
+    <div class="panel scroll"><table><thead><tr>${theadHtml("uprawy")}</tr></thead>
+    <tbody>${body}</tbody></table></div></div>`;
+}
+function filteredZab() {
+  const q = S.f.q.trim().toLowerCase();
+  return [...S.zabiegi.entries()].filter(([, z]) => +z.rok === +S.rok && (!S.f.pole || z.pole === S.f.pole) && (!S.f.rodzaj || z.rodzaj === S.f.rodzaj)
+      && (!q || [z.srodek, z.typ, z.uwagi, z.wykonawca, poleName(z.pole)].join(" ").toLowerCase().includes(q)))
+    .sort((a, b) => (b[1].data || "").localeCompare(a[1].data || "") || poleName(a[1].pole).localeCompare(poleName(b[1].pole), "pl", { numeric: true }));
+}
+const zabRows = () => sortRows("zabiegi", filteredZab().map(([id, z]) => ({ id, z })));
+function vZabiegi() {
+  const list = zabRows(); let koszt = 0;
+  const body = list.map(({ id, z }) => { const k = zabKoszt(z); koszt += k; const u = upr(z.pole, z.rok);
+    return `<tr class="click" data-act="edit-zab" data-id="${esc(id)}">
+      <td>${dPL(z.data)}</td><td class="pole">${esc(poleName(z.pole))}<div class="sub">${esc(u?.uprawa || "brak uprawy")}</div></td>
+      <td>${esc(z.rodzaj || "")}</td><td style="white-space:normal;min-width:160px">${esc(z.srodek || "")}${z.typ ? `<div class="sub">${esc(z.typ)}</div>` : ""}</td>
+      <td class="num">${fmt(num(z.dawka))} ${esc(z.jedn || "")}</td><td class="num">${fmt(zabHa(z))}</td>
+      <td class="num">${z.dawka ? fmt(zabIlosc(z), 1) + " " + esc(z.jedn || "") : ""}</td>
+      <td class="num">${k ? zl(k) : `<span class="empty">–</span>`}</td><td class="num">${fmt(num(z.N), 1)}</td>
+      <td class="wrap" title="${esc(z.uwagi || "")}">${esc(z.uwagi || "")}</td></tr>`; }).join("");
+  const poleOpts = `<option value="">Wszystkie pola</option>` + polaSorted().map(([id, p]) => `<option value="${esc(id)}"${S.f.pole === id ? " selected" : ""}>${esc(p.nazwa)}</option>`).join("");
+  const rOpts = `<option value="">Wszystkie zabiegi</option>` + [...new Set([...RODZAJE, ...[...S.zabiegi.values()].map(z => z.rodzaj).filter(Boolean)])].map(r => `<option${S.f.rodzaj === r ? " selected" : ""}>${esc(r)}</option>`).join("");
+  return `<div style="display:grid;gap:14px">
+    <div class="stats"><div class="stat"><b>${list.length}</b><span>zabiegów w sezonie ${sez(S.rok)}</span></div><div class="stat"><b>${zl(koszt)}</b><span>koszt (z cenami)</span></div></div>
+    <div class="toolbar">
+      <select id="f-pole" aria-label="Filtr pola">${poleOpts}</select>
+      <select id="f-rodzaj" aria-label="Filtr rodzaju">${rOpts}</select>
+      <input id="f-q" class="grow" type="search" placeholder="Szukaj środka, uwag…" value="${esc(S.f.q)}" aria-label="Szukaj">
+      ${sortSelect("zabiegi")}
+      ${downloads ? `<button data-act="csv">Pobierz CSV</button>` : ""}
+      ${S.canWrite ? `<button class="primary" data-act="new-zab">Dodaj zabieg</button>` : ""}
+    </div>
+    <div class="panel scroll"><table><thead><tr>${theadHtml("zabiegi")}</tr></thead>
+    <tbody>${body || `<tr><td colspan="10" class="empty">Brak zabiegów dla wybranych filtrów w sezonie ${sez(S.rok)}.</td></tr>`}</tbody></table></div></div>`;
+}
+function vPlodozmian() {
+  const ys = years();
+  const head = ys.map(y => `<th class="${y === S.rok ? "cur" : ""}">${sez(y)}</th>`).join("");
+  const body = polaSorted().map(([id, p]) => `<tr><td class="pole">${esc(p.nazwa)}<div class="sub">${fmt(num(p.ha))} ha</div></td>` + ys.map(y => {
+      const u = upr(id, y), prev = upr(id, y - 1);
+      const rep = u?.uprawa && prev?.uprawa && u.uprawa === prev.uprawa && !/TUZ|Trawy|traw|Lucerna|Koniczyna/.test(u.uprawa);
+      return `<td class="cell${rep ? " repeat" : ""}" tabindex="0" data-act="edit-upr" data-pole="${esc(id)}" data-rok="${y}" style="cursor:pointer">${u?.uprawa ? `<div style="background:${hue(u.uprawa)}">${esc(u.uprawa)}${u.status === "Plan" ? ` <span class="sub">(plan)</span>` : ""}</div>` : `<div class="none">+</div>`}</td>`; }).join("") + `</tr>`).join("");
+  return `<div style="display:grid;gap:14px">
+    <p class="sub" style="margin:0">Kliknij komórkę, aby zaplanować lub zmienić uprawę. Obramowanie oznacza tę samą uprawę dwa lata z rzędu (poza TUZ, trawami i motylkowymi wieloletnimi).</p>
+    <div class="panel scroll grid-rot"><table><thead><tr><th>Pole</th>${head}</tr></thead><tbody>${body}</tbody></table></div></div>`;
+}
+function vPodsum() {
+  const rok = S.rok; const byCrop = new Map(); let haAll = 0, kosztAll = 0, nOrgKg = 0;
+  const rows = sortRows("podsum", baseRows()).map(({ id, p, u, s }) => { const ha = num(p.ha) || 0;
+    haAll += ha; kosztAll += s.koszt; nOrgKg += s.Norg * ha;
+    const c = u?.uprawa || "Bez uprawy"; byCrop.set(c, (byCrop.get(c) || 0) + ha);
+    return `<tr><td class="pole">${esc(p.nazwa)}</td><td>${chip(u?.uprawa)}</td><td class="num">${fmt(ha)}</td>
+      <td class="num">${fmt(s.N, 0)}</td><td class="num">${fmt(s.P, 0)}</td><td class="num">${fmt(s.K, 0)}</td>
+      <td class="num">${s.Norg > N_ORG_LIMIT ? `<span class="pill bad">${fmt(s.Norg, 0)}</span>` : fmt(s.Norg, 0)}</td>
+      <td class="num">${s.koszt ? zl(s.koszt) : "–"}</td><td class="num">${s.koszt && ha ? zl(s.koszt / ha) : "–"}</td></tr>`; }).join("");
+  const crops = [...byCrop.entries()].sort((a, b) => b[1] - a[1]);
+  const bar = crops.map(([c, ha]) => `<div title="${esc(c)}: ${fmt(ha)} ha" style="flex:${ha};background:${c === "Bez uprawy" ? "var(--line)" : hue(c)}"></div>`).join("");
+  const keys = crops.map(([c, ha]) => `<span><i style="background:${c === "Bez uprawy" ? "var(--line)" : hue(c)}"></i>${esc(c)} <b>${fmt(ha)} ha</b> <span class="sub">${haAll ? fmt(ha / haAll * 100, 0) : 0}%</span></span>`).join("");
+  const avgOrg = haAll ? nOrgKg / haAll : 0;
+  return `<div style="display:grid;gap:14px">
+    <div class="stats"><div class="stat"><b>${fmt(haAll)} ha</b><span>powierzchnia</span></div><div class="stat"><b>${zl(kosztAll)}</b><span>koszt zabiegów ${sez(rok)}</span></div>
+      <div class="stat"><b>${fmt(avgOrg, 0)} kg/ha</b><span>N z nawozów naturalnych, średnio</span></div></div>
+    <div class="panel"><div class="struct"><b>Struktura zasiewów ${sez(rok)}</b><div class="bar">${bar}</div><div class="keys">${keys}</div></div>
+      <p class="note">Średnia dawka azotu z nawozów naturalnych w gospodarstwie nie może przekraczać ${N_ORG_LIMIT} kg N/ha rocznie (program azotanowy). ${avgOrg > N_ORG_LIMIT ? "<b>Limit przekroczony.</b>" : "Obecnie limit jest zachowany."} Wartości N, P₂O₅, K₂O pochodzą z kolumn składników w zabiegach i są przeliczone na całą powierzchnię pola.</p></div>
+    <div class="toolbar">${sortSelect("podsum")}</div>
+    <div class="panel scroll"><table><thead><tr>${theadHtml("podsum")}</tr></thead>
+    <tbody>${rows}</tbody></table></div></div>`;
+}
+
+/* ---------- formularze ---------- */
+let drawerState = null;
+const opt = (list, val) => `<option value=""></option>` + list.map(x => `<option${x === val ? " selected" : ""}>${esc(x)}</option>`).join("") + (val && !list.includes(val) ? `<option selected>${esc(val)}</option>` : "");
+const inp = (id, label, val, type = "text", extra = "") => `<div class="f"><label for="${id}">${label}</label><input id="${id}" type="${type}" value="${esc(val ?? "")}" ${extra}></div>`;
+function openDrawer(title, html, onSave, onDelete) {
+  drawerState = { onSave, onDelete };
+  $("#drawer-root").innerHTML = `<div class="drawer-bg" data-act="close"></div><form class="drawer" id="dform" novalidate>
+    <header><h2>${esc(title)}</h2></header><div class="body">${html}<div class="err" id="ferr"></div></div>
+    <footer>${S.canWrite ? `<button class="primary" type="submit">Zapisz</button>` : ""}<button type="button" data-act="close">Zamknij</button><span class="sp"></span>${onDelete && S.canWrite ? `<button type="button" class="danger" data-act="del">Usuń</button>` : ""}</footer></form>`;
+  if (!S.canWrite) $("#dform").querySelectorAll("input,select,textarea").forEach(e => e.disabled = true);
+  syncChecks();
+  setTimeout(() => $("#dform .body input, #dform .body select")?.focus(), 30);
+}
+const closeDrawer = () => { $("#drawer-root").innerHTML = ""; drawerState = null; render(); };
+const val = id => { const e = document.getElementById(id); return e ? e.value.trim() : ""; };
+
+function formPole(id) {
+  const p = id ? S.pola.get(id) : {};
+  openDrawer(id ? p.nazwa : "Nowe pole", `
+    ${inp("p-nazwa", "Nazwa pola", p.nazwa, "text", "required")}
+    <div class="row2">${inp("p-dz", "Nr działek ewid.", p.dzialki)}${inp("p-ha", "Powierzchnia (ha)", p.ha, "text", 'inputmode="decimal"')}</div>
+    ${inp("p-ident", "Identyfikator działki / obręb", p.ident)}
+    <div class="row3">${inp("p-klasa", "Klasa gleby", p.klasa)}${inp("p-ph", "pH (KCl)", p.ph, "text", 'inputmode="decimal"')}${inp("p-an", "Data analizy", p.analiza, "date")}</div>
+    <div class="row2">${inp("p-p", "P₂O₅ mg/kg", p.p2o5, "text", 'inputmode="decimal"')}${inp("p-k", "K₂O mg/kg", p.k2o, "text", 'inputmode="decimal"')}</div>
+    <div class="f"><label for="p-wl">Własność / dzierżawa</label><select id="p-wl">${opt(["Własność","Dzierżawa","Inne"], p.wlasnosc)}</select></div>
+    <div class="f"><label for="p-uw">Uwagi</label><textarea id="p-uw" rows="3">${esc(p.uwagi || "")}</textarea></div>
+    ${id ? "" : `<div class="f"><label for="p-upr">Uprawa w sezonie ${sez(S.rok)}</label><select id="p-upr">${opt(UPRAWY, "")}</select><span class="hint">Opcjonalnie. Uprawę możesz też wpisać później w zakładce Uprawy lub Płodozmian.</span></div>`}`,
+  async () => {
+    const nazwa = val("p-nazwa"); if (!nazwa) throw "Wpisz nazwę pola.";
+    const ha = num(val("p-ha")); if (ha === null || ha <= 0) throw "Wpisz powierzchnię w hektarach, np. 2,45.";
+    let key = id; if (!key) { key = slug(nazwa); let i = 2; while (S.pola.has(key)) key = slug(nazwa) + "-" + i++; }
+    await db.collection("pola").doc(key).set({ nazwa, dzialki: val("p-dz"), ident: val("p-ident"), ha, klasa: val("p-klasa"), ph: num(val("p-ph")), analiza: val("p-an"), p2o5: num(val("p-p")), k2o: num(val("p-k")), wlasnosc: val("p-wl"), uwagi: val("p-uw") });
+    if (!id && val("p-upr")) await db.collection("uprawy").doc(`${key}_${S.rok}`).set({ pole: key, rok: S.rok, uprawa: val("p-upr"), odmiana: "", status: S.rok > new Date().getFullYear() ? "Plan" : "W trakcie", siew: "", norma: null, zbior: "", plon: null, uwagi: "" });
+    return "Zapisano pole " + nazwa;
+  }, id ? async () => {
+    const used = [...S.uprawy.values()].some(u => u.pole === id) || [...S.zabiegi.values()].some(z => z.pole === id);
+    if (used) throw "To pole ma zapisane uprawy lub zabiegi. Usuń je najpierw.";
+    await db.collection("pola").doc(id).delete(); return "Usunięto pole";
+  } : null);
+}
+function formUpr(poleId, rok) {
+  const u = upr(poleId, rok) || {}; const key = `${poleId}_${rok}`;
+  openDrawer(`${poleName(poleId)} · ${sez(rok)}`, `
+    <p class="sub" style="margin:0">Powierzchnia pola: ${fmt(poleHa(poleId))} ha. Przedplon: ${esc(upr(poleId, rok - 1)?.uprawa || "brak wpisu")}.</p>
+    <div class="row2"><div class="f"><label for="u-up">Uprawa</label><select id="u-up">${opt(UPRAWY, u.uprawa)}</select></div>${inp("u-odm", "Odmiana", u.odmiana)}</div>
+    <div class="f"><label for="u-st">Status</label><select id="u-st">${opt(STATUS, u.status || (rok > new Date().getFullYear() ? "Plan" : ""))}</select></div>
+    <div class="row2">${inp("u-siew", "Data siewu", u.siew, "date")}${inp("u-norma", "Norma wysiewu (kg/ha)", u.norma, "text", 'inputmode="decimal"')}</div>
+    <div class="row2">${inp("u-zb", "Data zbioru", u.zbior, "date")}${inp("u-plon", "Plon (t/ha)", u.plon, "text", 'inputmode="decimal"')}</div>
+    <div class="f"><label for="u-uw">Uwagi</label><textarea id="u-uw" rows="3">${esc(u.uwagi || "")}</textarea></div>`,
+  async () => {
+    const uprawa = val("u-up"); if (!uprawa) throw "Wybierz uprawę.";
+    await db.collection("uprawy").doc(key).set({ pole: poleId, rok: +rok, uprawa, odmiana: val("u-odm"), status: val("u-st"), siew: val("u-siew"), norma: num(val("u-norma")), zbior: val("u-zb"), plon: num(val("u-plon")), uwagi: val("u-uw") });
+    return `Zapisano: ${uprawa} na ${poleName(poleId)}`;
+  }, S.uprawy.has(key) ? async () => { await db.collection("uprawy").doc(key).delete(); return "Usunięto uprawę"; } : null);
+}
+const polaN = n => `${n} ${n === 1 ? "pole" : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)) ? "pola" : "pól"}`;
+function groupByCrop(rok) {
+  const g = new Map();
+  for (const [pid] of polaSorted()) { const c = upr(pid, rok)?.uprawa || "Bez uprawy"; if (!g.has(c)) g.set(c, { name: c, ids: [], ha: 0 }); const x = g.get(c); x.ids.push(pid); x.ha += poleHa(pid); }
+  return [...g.values()].sort((a, b) => (a.name === "Bez uprawy") - (b.name === "Bez uprawy") || b.ha - a.ha);
+}
+function polaChecks(rok, checked) {
+  return groupByCrop(rok).map((g, gi) => `<div class="grp">
+    <label class="grp-h"><input type="checkbox" data-grp="${gi}">${g.name === "Bez uprawy" ? `<span class="empty">Bez uprawy w sezonie ${sez(rok)}</span>` : chip(g.name)} <span class="sub">${polaN(g.ids.length)} · ${fmt(g.ha)} ha</span></label>
+    <div class="grp-b">${g.ids.map(pid => `<label><input type="checkbox" name="z-pola" data-g="${gi}" value="${esc(pid)}"${checked.has(pid) ? " checked" : ""}>${esc(poleName(pid))} <span class="sub">${fmt(poleHa(pid))}</span></label>`).join("")}</div></div>`).join("");
+}
+function syncChecks() {
+  const box = $("#z-checks"); if (!box) return;
+  box.querySelectorAll("input[data-grp]").forEach(h => { const m = [...box.querySelectorAll(`input[data-g="${h.dataset.grp}"]`)]; const n = m.filter(x => x.checked).length; h.checked = n > 0 && n === m.length; h.indeterminate = n > 0 && n < m.length; });
+  const sel = [...box.querySelectorAll('input[name="z-pola"]:checked')].map(e => e.value);
+  const sum = $("#z-sum"); if (sum) sum.textContent = sel.length ? `Zaznaczono: ${polaN(sel.length)}, ${fmt(sel.reduce((a, p) => a + poleHa(p), 0))} ha` : "";
+}
+const SIEW = ["Siew uprawy głównej", "Siew agregatem uprawowo-siewnym", "Siew międzyplonu", "Sadzenie"];
+const SIEW_GLOWNY = ["Siew uprawy głównej", "Siew agregatem uprawowo-siewnym", "Sadzenie"];
+const isSow = (rodzaj, typ) => SIEW.includes(rodzaj) && (!typ || typ === "Nasiona");
+// "Kukurydza (Farmoritz)" -> gatunek + odmiana (dla starszych wpisów bez osobnych pól)
+function splitSeed(z) {
+  if (z.gatunek) return { g: z.gatunek, o: z.odmiana || "" };
+  const m = /^(.*?)\s*\(([^)]*)\)\s*$/.exec(z.srodek || "");
+  return m ? { g: m[1], o: m[2] === "Zdecyduję później" ? "" : m[2] } : { g: z.srodek || "", o: "" };
+}
+// lista roślin w siewie: [{gatunek, odmiana, dawka}]
+function seedRows(z) {
+  if (Array.isArray(z.rosliny) && z.rosliny.length) return z.rosliny;
+  const s = splitSeed(z); return [{ gatunek: s.g, odmiana: s.o, dawka: z.rodzaj && SIEW.includes(z.rodzaj) ? z.dawka ?? null : null }];
+}
+const rosRow = (r = {}) => `<div class="ros-row">
+  <input class="r-gat" list="dl-uprawy" autocomplete="off" placeholder="np. Pszenżyto ozime" aria-label="Gatunek rośliny" value="${esc(r.gatunek || "")}">
+  <input class="r-odm" placeholder="np. Borowik" aria-label="Odmiana" value="${esc(r.odmiana || "")}">
+  <input class="r-daw" inputmode="decimal" placeholder="—" aria-label="Norma na ha" value="${esc(r.dawka ?? "")}">
+  <button type="button" class="ros-del" data-act="ros-del" aria-label="Usuń roślinę" title="Usuń roślinę">×</button></div>`;
+function readRos() {
+  return [...document.querySelectorAll("#z-ros .ros-row")].map(r => ({ gatunek: r.querySelector(".r-gat").value.trim(), odmiana: r.querySelector(".r-odm").value.trim(), dawka: num(r.querySelector(".r-daw").value) })).filter(r => r.gatunek || r.odmiana);
+}
+function syncRos() {
+  const rows = [...document.querySelectorAll("#z-ros .ros-row")];
+  rows.forEach(r => r.querySelector(".ros-del").hidden = rows.length < 2);
+  const d = readRos().map(r => r.dawka).filter(v => v !== null);
+  if (d.length) { const t = document.getElementById("z-daw"); if (t) t.value = String(Math.round(d.reduce((a, b) => a + b, 0) * 100) / 100).replace(".", ","); }
+}
+const seedLabel = rs => rs.map(r => r.gatunek + (r.odmiana ? ` (${r.odmiana})` : "")).join(" + ");
+// Siew od lipca należy do następnego sezonu (np. ozimina 04.11.2026 -> 2026/2027)
+function autoSeason() {
+  const r = val("z-rodz"), d = val("z-data"), sel = document.getElementById("z-rok"), hint = document.getElementById("z-rok-hint");
+  if (!sel || !hint) return;
+  if (!isSow(r, val("z-typ")) || !/^\d{4}-\d{2}-\d{2}$/.test(d)) { hint.hidden = true; return; }
+  const y = +d.slice(0, 4), m = +d.slice(5, 7), rok = m >= 7 ? y + 1 : y;
+  if (![...sel.options].some(o => +o.value === rok)) sel.insertAdjacentHTML("beforeend", `<option value="${rok}">${sez(rok)}</option>`);
+  const changed = +sel.value !== rok;
+  sel.value = rok;
+  hint.textContent = `Ustawiono według daty siewu: ${sez(rok)}`; hint.hidden = false;
+  if (changed) sel.dispatchEvent(new Event("change", { bubbles: true }));
+}
+function zabFormMode() {
+  const r = val("z-rodz"), sow = isSow(r, val("z-typ"));
+  const show = (id, on) => { const e = document.getElementById(id); if (e) e.hidden = !on; };
+  show("z-typ-wrap", !sow); show("z-sr-wrap", !sow); show("z-nut", !sow);
+  show("z-siew-wrap", sow); show("z-upd-wrap", sow && SIEW_GLOWNY.includes(r));
+  const j = document.getElementById("z-j"); if (sow && j && !j.value) j.value = "kg";
+}
+function formZab(id) {
+  const z = id ? S.zabiegi.get(id) : { rok: S.rok, data: new Date().toISOString().slice(0, 10), pole: S.f.pole };
+  const ros = seedRows(z);
+  const poleField = id
+    ? `<div class="f"><label for="z-pole">Pole</label><select id="z-pole">${groupByCrop(+z.rok).map(g => `<optgroup label="${esc(g.name)}">${g.ids.map(pid => `<option value="${esc(pid)}"${pid === z.pole ? " selected" : ""}>${esc(poleName(pid))}</option>`).join("")}</optgroup>`).join("")}</select></div>`
+    : `<div class="f"><label>Pola (pogrupowane według uprawy)</label><div class="checks" id="z-checks">${polaChecks(+z.rok, new Set(z.pole ? [z.pole] : []))}</div><span class="hint" id="z-sum"></span>
+       <span class="hint">Zaznacz całą grupę jednym kliknięciem przy nazwie uprawy albo pojedyncze pola. Zabieg zapisze się na każdym z nich, na całej powierzchni pola.</span></div>`;
+  openDrawer(id ? "Zabieg" : "Nowy zabieg", `
+    <div class="row2">${inp("z-data", "Data", z.data, "date")}<div class="f"><label for="z-rok">Sezon</label><select id="z-rok">${years().map(y => `<option value="${y}"${y === +z.rok ? " selected" : ""}>${sez(y)}</option>`).join("")}</select><span class="hint" id="z-rok-hint" hidden></span></div></div>
+    ${poleField}
+    <div class="row2"><div class="f"><label for="z-rodz">Rodzaj zabiegu</label><select id="z-rodz">${opt(RODZAJE, z.rodzaj)}</select></div><div class="f" id="z-typ-wrap"><label for="z-typ">Typ środka</label><select id="z-typ">${opt(TYPY, z.typ)}</select></div></div>
+    <div id="z-siew-wrap" hidden style="display:grid;gap:12px">
+      <div class="f"><label>Rośliny w siewie</label>
+        <div class="ros-head"><span>Gatunek</span><span>Odmiana</span><span>Norma/ha</span><span></span></div>
+        <div id="z-ros" style="display:grid;gap:6px">${ros.map(rosRow).join("")}</div>
+        <div><button type="button" data-act="ros-add">+ Dodaj roślinę lub odmianę</button></div>
+        <span class="hint">Mieszanka gatunków albo kilka odmian na jednym polu: każda w osobnym wierszu. Normy się sumują do pola „Dawka na ha”.</span></div>
+      <datalist id="dl-uprawy">${UPRAWY.concat(["Owies jary","Gorczyca biała","Facelia","Rzodkiew oleista","Peluszka","Wyka"]).map(u => `<option value="${esc(u)}"></option>`).join("")}</datalist>
+      <label id="z-upd-wrap" class="sub" style="display:flex;gap:8px;align-items:flex-start;text-transform:none;letter-spacing:0;font-size:13px"><input type="checkbox" id="z-upd"${id ? "" : " checked"} style="margin-top:2px">Zapisz też jako uprawę pola w tym sezonie (gatunek, odmiana, data siewu i norma wysiewu w zakładce Uprawy)</label>
+    </div>
+    <div id="z-sr-wrap">${inp("z-sr", "Środek / nawóz / narzędzie", z.srodek)}</div>
+    <div class="row3">${inp("z-daw", "Dawka na ha", z.dawka, "text", 'inputmode="decimal"')}<div class="f"><label for="z-j">Jednostka</label><select id="z-j">${opt(JEDN, z.jedn)}</select></div>${inp("z-cena", "Cena zł/jedn.", z.cena, "text", 'inputmode="decimal"')}</div>
+    ${id ? inp("z-ha", "Powierzchnia zabiegu (ha)", z.ha, "text", 'inputmode="decimal"') + `<span class="hint">Puste = całe pole (${fmt(poleHa(z.pole))} ha).</span>` : ""}
+    <div class="row3">${inp("z-bbch", "Faza BBCH", z.bbch)}${inp("z-pog", "Pogoda", z.pogoda)}${inp("z-wyk", "Wykonawca", z.wykonawca)}</div>
+    <div id="z-nut" style="display:grid;gap:12px">
+      <div class="row3">${inp("z-n", "N kg/ha", z.N, "text", 'inputmode="decimal"')}${inp("z-p", "P₂O₅ kg/ha", z.P, "text", 'inputmode="decimal"')}${inp("z-k", "K₂O kg/ha", z.K, "text", 'inputmode="decimal"')}</div>
+      <div class="row2">${inp("z-s", "S kg/ha", z.S, "text", 'inputmode="decimal"')}${inp("z-mg", "MgO kg/ha", z.Mg, "text", 'inputmode="decimal"')}</div>
+    </div>
+    <div class="f"><label for="z-uw">Uwagi</label><textarea id="z-uw" rows="3">${esc(z.uwagi || "")}</textarea></div>`,
+  async () => {
+    const rok = parseInt(val("z-rok"), 10); if (!rok) throw "Wybierz sezon.";
+    if (!val("z-data")) throw "Wpisz datę zabiegu.";
+    const rodzaj = val("z-rodz"); if (!rodzaj) throw "Wybierz rodzaj zabiegu.";
+    const sow = isSow(rodzaj, val("z-typ"));
+    const ros = sow ? readRos() : [];
+    if (sow && (!ros.length || ros.some(r => !r.gatunek))) throw "Wpisz gatunek rośliny w każdym wierszu, np. Pszenżyto ozime.";
+    const gatunki = [...new Set(ros.map(r => r.gatunek))], odmiany = ros.map(r => r.odmiana).filter(Boolean);
+    const gat = gatunki.join(" + "), odm = odmiany.join(", ");
+    const base = { data: val("z-data"), rok, rodzaj, typ: sow ? "Nasiona" : val("z-typ"),
+      srodek: sow ? seedLabel(ros) : val("z-sr"), gatunek: sow ? gat : "", odmiana: sow ? odm : "", rosliny: sow ? ros : null,
+      dawka: num(val("z-daw")), jedn: val("z-j"), cena: num(val("z-cena")), bbch: val("z-bbch"), pogoda: val("z-pog"), wykonawca: val("z-wyk"),
+      N: sow ? null : num(val("z-n")), P: sow ? null : num(val("z-p")), K: sow ? null : num(val("z-k")), S: sow ? null : num(val("z-s")), Mg: sow ? null : num(val("z-mg")), uwagi: val("z-uw") };
+    const pola = id ? [val("z-pole")] : [...document.querySelectorAll('input[name="z-pola"]:checked')].map(e => e.value);
+    if (!pola.length) throw "Zaznacz co najmniej jedno pole.";
+    if (id) await db.collection("zabiegi").doc(id).set({ ...base, pole: pola[0], ha: num(val("z-ha")) });
+    else for (const pid of pola) await db.collection("zabiegi").add({ ...base, pole: pid, ha: null });
+    let extra = "";
+    if (sow && SIEW_GLOWNY.includes(rodzaj) && document.getElementById("z-upd")?.checked) {
+      for (const pid of pola) {
+        const u = upr(pid, rok) || {};
+        await db.collection("uprawy").doc(`${pid}_${rok}`).set({ pole: pid, rok, uprawa: gat, odmiana: odm || (u.uprawa === gat ? u.odmiana || "" : ""),
+          status: u.status === "Zrealizowane" ? u.status : "W trakcie", siew: base.data, norma: base.jedn === "kg" ? base.dawka : (u.norma ?? null),
+          zbior: u.zbior || "", plon: u.plon ?? null, uwagi: u.uwagi || "" });
+      }
+      extra = ` i uprawę na ${pola.length === 1 ? "polu" : polaN(pola.length)}`;
+    }
+    return (id ? "Zapisano zabieg" : pola.length === 1 ? "Dodano zabieg" : `Dodano zabieg na ${polaN(pola.length)}`) + extra;
+  }, id ? async () => { await db.collection("zabiegi").doc(id).delete(); return "Usunięto zabieg"; } : null);
+  zabFormMode(); syncRos();
+}
+
+async function exportCsv() {
+  const cols = ["Data","Sezon","Pole","Uprawa","Rodzaj","Typ środka","Środek","Dawka/ha","Jednostka","ha","Ilość","Cena","Koszt","N","P2O5","K2O","S","MgO","BBCH","Pogoda","Wykonawca","Uwagi"];
+  const q = v => { const s = v === null || v === undefined ? "" : String(v); return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const n = v => v === null || v === undefined || v === "" ? "" : String(v).replace(".", ",");
+  const lines = [cols.join(";")].concat(zabRows().map(({ z }) => [z.data, sez(+z.rok), poleName(z.pole), upr(z.pole, z.rok)?.uprawa || "", z.rodzaj, z.typ, z.srodek, n(z.dawka), z.jedn, n(zabHa(z)), n(+zabIlosc(z).toFixed(2)), n(z.cena), n(+zabKoszt(z).toFixed(2)), n(z.N), n(z.P), n(z.K), n(z.S), n(z.Mg), z.bbch, z.pogoda, z.wykonawca, z.uwagi].map(q).join(";")));
+  try { await downloads.save({ filename: `zabiegi_${S.rok - 1}-${S.rok}.csv`, data: new Blob(["﻿" + lines.join("\n")], { type: "text/csv" }) }); }
+  catch (e) { toast("Nie pobrano pliku"); }
+}
+
+/* ---------- zdarzenia ---------- */
+function toast(t) { $("#toast-root").innerHTML = `<div class="toast">${esc(t)}</div>`; clearTimeout(toast.t); toast.t = setTimeout(() => $("#toast-root").innerHTML = "", 2600); }
+document.addEventListener("click", async e => {
+  const sb = e.target.closest("button[data-sort]"); if (sb) { setSort(sb.dataset.sortview, sb.dataset.sort); return; }
+  const tab = e.target.closest("nav.tabs a[data-view]");
+  if (tab) { e.preventDefault(); S.view = tab.dataset.view; try { if (location.hash !== "#" + S.view) location.hash = S.view; } catch (_) {} render(); return; }
+  const el = e.target.closest("[data-act]"); if (!el) return;
+  const a = el.dataset.act;
+  if (a === "close") return closeDrawer();
+  if (a === "ros-add") { $("#z-ros").insertAdjacentHTML("beforeend", rosRow()); syncRos(); $("#z-ros .ros-row:last-child .r-gat").focus(); return; }
+  if (a === "ros-del") { el.closest(".ros-row").remove(); syncRos(); return; }
+  if (a === "del") {
+    if (!el.classList.contains("armed")) { el.classList.add("armed"); el.textContent = "Kliknij, aby potwierdzić"; return; }
+    try { el.disabled = true; toast(await drawerState.onDelete()); closeDrawer(); } catch (err) { $("#ferr").textContent = typeof err === "string" ? err : "Nie udało się usunąć. Spróbuj ponownie."; el.disabled = false; }
+    return;
+  }
+  if (!db) return;
+  if (a === "new-pole") formPole(null);
+  if (a === "edit-pole") formPole(el.dataset.id);
+  if (a === "edit-upr") formUpr(el.dataset.pole, +el.dataset.rok);
+  if (a === "new-zab") formZab(null);
+  if (a === "edit-zab") formZab(el.dataset.id);
+  if (a === "csv") exportCsv();
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && drawerState) closeDrawer();
+  if ((e.key === "Enter" || e.key === " ") && e.target.matches("td.cell[data-act]")) { e.preventDefault(); e.target.click(); }
+});
+document.addEventListener("submit", async e => {
+  if (e.target.id !== "dform") return; e.preventDefault();
+  const btn = e.target.querySelector('button[type="submit"]');
+  try { btn.disabled = true; toast(await drawerState.onSave()); closeDrawer(); }
+  catch (err) { $("#ferr").textContent = typeof err === "string" ? err : (err?.code === "invalid_argument" ? "Nie masz uprawnień do zapisu w tej aplikacji." : "Nie udało się zapisać. Sprawdź połączenie i spróbuj ponownie."); btn.disabled = false; }
+});
+document.addEventListener("change", e => {
+  if (e.target.id === "rok") { S.rok = +e.target.value; render(); }
+  if (e.target.dataset.sortsel) { const [k, d] = e.target.value.split(":"); setSort(e.target.dataset.sortsel, k, +d); }
+  if (e.target.matches("#z-checks input[data-grp]")) { $("#z-checks").querySelectorAll(`input[data-g="${e.target.dataset.grp}"]`).forEach(x => x.checked = e.target.checked); syncChecks(); }
+  if (e.target.matches('#z-checks input[name="z-pola"]')) syncChecks();
+  if (e.target.id === "z-rodz" || e.target.id === "z-typ") zabFormMode();
+  if (e.target.id === "z-rodz" || e.target.id === "z-typ" || e.target.id === "z-data") autoSeason();
+  if (e.target.id === "z-rok" && $("#z-checks")) { const keep = new Set([...document.querySelectorAll('input[name="z-pola"]:checked')].map(x => x.value)); $("#z-checks").innerHTML = polaChecks(+e.target.value, keep); syncChecks(); }
+  if (e.target.id === "f-pole") { S.f.pole = e.target.value; render(); }
+  if (e.target.id === "f-rodzaj") { S.f.rodzaj = e.target.value; render(); }
+});
+document.addEventListener("input", e => {
+  if (e.target.matches?.("#z-ros .r-daw")) syncRos();
+  if (e.target.id === "f-q") { S.f.q = e.target.value; clearTimeout(S.qt); S.qt = setTimeout(() => { const pos = e.target.selectionStart; render(); const q = $("#f-q"); if (q) { q.focus(); q.setSelectionRange(pos, pos); } }, 250); }
+});
+function route() { const h = location.hash.replace("#", ""); S.view = ["pola","uprawy","zabiegi","plodozmian","podsumowanie"].includes(h) ? h : "pola"; render(); }
+window.addEventListener("hashchange", route);
+
+/* ---------- start ---------- */
+route();
+(async () => {
+  const st = $("#status");
+  db = await window.claude?.use?.("db") ?? null;
+  if (!db) { st.textContent = "Baza danych jest niedostępna w tym widoku. Zaloguj się do claude.ai, aby zobaczyć dane gospodarstwa."; st.className = "bad"; return; }
+  const user = await window.claude.use("user");
+  const cw = user ? await user.can("data.write") : null;
+  S.canWrite = cw !== false;
+  downloads = await window.claude.use("downloads");
+  const timer = setTimeout(() => { st.textContent = "Dane jeszcze się nie wczytały. Sprawdź połączenie z internetem."; st.className = "bad"; }, 10000);
+  for (const col of ["pola", "uprawy", "zabiegi"]) {
+    db.collection(col).onSnapshot(snap => {
+      const m = new Map(); snap.docs.forEach(d => m.set(d.id, d.data()));
+      S[col] = m; if (!snap.metadata.fromCache) S.loaded[col] = true;
+      if (Object.values(S.loaded).every(Boolean)) { clearTimeout(timer); st.textContent = S.canWrite ? "" : "Tryb tylko do odczytu."; st.className = ""; st.hidden = S.canWrite; }
+      if (!drawerState) render();
+    }, err => { clearTimeout(timer); st.hidden = false; st.textContent = "Nie można wczytać danych (" + err.code + "). Odśwież stronę później."; st.className = "bad"; });
+  }
+})();
+})();
+</script>
