@@ -574,6 +574,18 @@ function syncRos() {
   if (d.length) { const t = document.getElementById("z-daw"); if (t) t.value = String(Math.round(d.reduce((a, b) => a + b, 0) * 100) / 100).replace(".", ","); }
 }
 const seedLabel = rs => rs.map(r => r.gatunek + (r.odmiana ? ` (${r.odmiana})` : "")).join(" + ");
+// Siew od lipca należy do następnego sezonu (np. ozimina 04.11.2026 -> 2026/2027)
+function autoSeason() {
+  const r = val("z-rodz"), d = val("z-data"), sel = document.getElementById("z-rok"), hint = document.getElementById("z-rok-hint");
+  if (!sel || !hint) return;
+  if (!isSow(r, val("z-typ")) || !/^\d{4}-\d{2}-\d{2}$/.test(d)) { hint.hidden = true; return; }
+  const y = +d.slice(0, 4), m = +d.slice(5, 7), rok = m >= 7 ? y + 1 : y;
+  if (![...sel.options].some(o => +o.value === rok)) sel.insertAdjacentHTML("beforeend", `<option value="${rok}">${sez(rok)}</option>`);
+  const changed = +sel.value !== rok;
+  sel.value = rok;
+  hint.textContent = `Ustawiono według daty siewu: ${sez(rok)}`; hint.hidden = false;
+  if (changed) sel.dispatchEvent(new Event("change", { bubbles: true }));
+}
 function zabFormMode() {
   const r = val("z-rodz"), sow = isSow(r, val("z-typ"));
   const show = (id, on) => { const e = document.getElementById(id); if (e) e.hidden = !on; };
@@ -589,7 +601,7 @@ function formZab(id) {
     : `<div class="f"><label>Pola (pogrupowane według uprawy)</label><div class="checks" id="z-checks">${polaChecks(+z.rok, new Set(z.pole ? [z.pole] : []))}</div><span class="hint" id="z-sum"></span>
        <span class="hint">Zaznacz całą grupę jednym kliknięciem przy nazwie uprawy albo pojedyncze pola. Zabieg zapisze się na każdym z nich, na całej powierzchni pola.</span></div>`;
   openDrawer(id ? "Zabieg" : "Nowy zabieg", `
-    <div class="row2">${inp("z-data", "Data", z.data, "date")}<div class="f"><label for="z-rok">Sezon</label><select id="z-rok">${years().map(y => `<option value="${y}"${y === +z.rok ? " selected" : ""}>${sez(y)}</option>`).join("")}</select></div></div>
+    <div class="row2">${inp("z-data", "Data", z.data, "date")}<div class="f"><label for="z-rok">Sezon</label><select id="z-rok">${years().map(y => `<option value="${y}"${y === +z.rok ? " selected" : ""}>${sez(y)}</option>`).join("")}</select><span class="hint" id="z-rok-hint" hidden></span></div></div>
     ${poleField}
     <div class="row2"><div class="f"><label for="z-rodz">Rodzaj zabiegu</label><select id="z-rodz">${opt(RODZAJE, z.rodzaj)}</select></div><div class="f" id="z-typ-wrap"><label for="z-typ">Typ środka</label><select id="z-typ">${opt(TYPY, z.typ)}</select></div></div>
     <div id="z-siew-wrap" hidden style="display:grid;gap:12px">
@@ -691,6 +703,7 @@ document.addEventListener("change", e => {
   if (e.target.matches("#z-checks input[data-grp]")) { $("#z-checks").querySelectorAll(`input[data-g="${e.target.dataset.grp}"]`).forEach(x => x.checked = e.target.checked); syncChecks(); }
   if (e.target.matches('#z-checks input[name="z-pola"]')) syncChecks();
   if (e.target.id === "z-rodz" || e.target.id === "z-typ") zabFormMode();
+  if (e.target.id === "z-rodz" || e.target.id === "z-typ" || e.target.id === "z-data") autoSeason();
   if (e.target.id === "z-rok" && $("#z-checks")) { const keep = new Set([...document.querySelectorAll('input[name="z-pola"]:checked')].map(x => x.value)); $("#z-checks").innerHTML = polaChecks(+e.target.value, keep); syncChecks(); }
   if (e.target.id === "f-pole") { S.f.pole = e.target.value; render(); }
   if (e.target.id === "f-rodzaj") { S.f.rodzaj = e.target.value; render(); }
