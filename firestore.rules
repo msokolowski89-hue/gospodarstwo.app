@@ -1,0 +1,15 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Dostęp tylko dla wymienionych kont Google.
+    // Wpisz swój adres (i ewentualnie adresy pracowników) zamiast TWOJ_EMAIL@gmail.com.
+    function uprawniony() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in ['TWOJ_EMAIL@gmail.com'];
+    }
+    match /{kolekcja}/{dokument} {
+      allow read, write: if uprawniony() && kolekcja in ['pola', 'uprawy', 'zabiegi'];
+    }
+  }
+}
