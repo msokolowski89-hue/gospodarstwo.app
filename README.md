@@ -43,7 +43,7 @@ Kliknij **Opublikuj**.
    - bez README i bez .gitignore.
 2. Wyślij ten folder do repozytorium. W Terminalu, w tym folderze, wpisz:
    ```
-   git remote add origin https://github.com/TWOJ_LOGIN/gospodarstwo.git
+   git remote add origin https://github.com/msokolowski89-hue/gospodarstwo.app.git
    git push -u origin main
    ```
    Przy pierwszym wysłaniu macOS zapyta o login GitHub. Jako hasło podaj **token**, nie hasło do konta. Token tworzysz w GitHub → Settings → Developer settings → Personal access tokens. Możesz też zamiast tego użyć programu **GitHub Desktop**.
@@ -52,8 +52,8 @@ Kliknij **Opublikuj**.
    - **Branch: `main` / `(root)`**,
    - kliknij **Save**.
 
-   Po około minucie strona będzie pod adresem `https://TWOJ_LOGIN.github.io/gospodarstwo/`.
-4. W Firebase wejdź w **Authentication → Ustawienia → Autoryzowane domeny → Dodaj domenę** i wpisz `TWOJ_LOGIN.github.io`.
+   Po około minucie strona będzie pod adresem `https://msokolowski89-hue.github.io/gospodarstwo.app/`.
+4. W Firebase wejdź w **Authentication → Ustawienia → Autoryzowane domeny → Dodaj domenę** i wpisz `msokolowski89-hue.github.io`.
 
 ## Krok 4. Przeniesienie danych
 
