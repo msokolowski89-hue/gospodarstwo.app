@@ -40,15 +40,18 @@ if (!window.firebase || !window.FIREBASE_CONFIG || !window.FIREBASE_CONFIG.apiKe
     db = fdb; S.canWrite = true;
     $("#userbox").hidden = false; $("#who").textContent = u.email || u.displayName || "";
     st.hidden = false; st.className = ""; st.textContent = "Wczytywanie danych gospodarstwa…";
-    S.loaded = { pola: false, uprawy: false, zabiegi: false };
+    S.loaded = Object.fromEntries(COLS.map(c => [c, false])); S.herdErr = null;
     const timer = setTimeout(() => { st.textContent = "Brak połączenia z bazą. Pokazuję dane zapisane na tym urządzeniu; zmiany wyślą się po odzyskaniu zasięgu."; st.className = "bad"; }, 10000);
-    for (const col of ["pola", "uprawy", "zabiegi"]) {
+    for (const col of COLS) {
       unsubs.push(db.collection(col).onSnapshot({ includeMetadataChanges: true }, snap => {
         const m = new Map(); snap.docs.forEach(d => m.set(d.id, d.data()));
         S[col] = m; if (!snap.metadata.fromCache) S.loaded[col] = true;
         if (Object.values(S.loaded).every(Boolean)) { clearTimeout(timer); st.textContent = ""; st.className = ""; st.hidden = true; }
         if (!drawerState) render();
       }, err => {
+        if (HERD_COLS.includes(col)) { S.herdErr = err.code; S.loaded[col] = true;   // stado bez reguł nie blokuje pól
+          if (Object.values(S.loaded).every(Boolean)) { clearTimeout(timer); st.hidden = true; }
+          if (!drawerState) render(); return; }
         clearTimeout(timer); st.hidden = false; st.className = "bad";
         st.textContent = err.code === "permission-denied"
           ? `Konto ${u.email} nie ma dostępu do danych. Dodaj ten adres w regułach Firestore (plik firestore.rules) albo zaloguj się innym kontem.`
@@ -70,15 +73,15 @@ if (!window.firebase || !window.FIREBASE_CONFIG || !window.FIREBASE_CONFIG.apiKe
 }
 async function exportBackup() {
   const out = { wersja: 1, data: new Date().toISOString() };
-  for (const col of ["pola", "uprawy", "zabiegi"]) out[col] = Object.fromEntries(S[col]);
+  for (const col of COLS) out[col] = Object.fromEntries(S[col]);
   await downloads.save({ filename: `gospodarstwo-kopia-${new Date().toISOString().slice(0, 10)}.json`, data: new Blob([JSON.stringify(out, null, 1)], { type: "application/json" }) });
 }
 async function importBackup(file) {
   if (!db) return;
   let data; try { data = JSON.parse(await file.text()); } catch (_) { toast("To nie jest poprawny plik JSON"); return; }
-  const cols = ["pola", "uprawy", "zabiegi"].filter(c => data[c] && typeof data[c] === "object");
+  const cols = COLS.filter(c => data[c] && typeof data[c] === "object");
   const n = cols.reduce((a, c) => a + Object.keys(data[c]).length, 0);
-  if (!n) { toast("W pliku nie ma pól, upraw ani zabiegów"); return; }
+  if (!n) { toast("W pliku nie ma pól, upraw, zabiegów ani danych stada"); return; }
   if (!confirm(`Zaimportować ${n} rekordów (${cols.map(c => c + ": " + Object.keys(data[c]).length).join(", ")})?\nRekordy o tych samych identyfikatorach zostaną nadpisane.`)) return;
   st.hidden = false; st.className = ""; st.textContent = "Importowanie…";
   try {
@@ -125,7 +128,7 @@ head_part=head_part.replace("<style>","<style>\n"+reset,1)
 doc='<!doctype html>\n<html lang="pl">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n<meta name="robots" content="noindex">\n'+head_part+"\n"+firebase+"</head>\n<body>\n"+body_part.strip()+"\n</body>\n</html>\n"
 doc=doc.replace("function showLogin(msg) {\n", "function showLogin(msg) {\n  S.needLogin = true;\n",1)
 doc=doc.replace("    if (!u) { db = null; st.hidden = true; showLogin(); return; }\n    db = fdb;", "    if (!u) { db = null; st.hidden = true; showLogin(); return; }\n    S.needLogin = false; db = fdb;",1)
-a='  $("#quick").hidden = !db || !S.canWrite;\n'
+a='  $("#quick").hidden = !db || !S.canWrite || herd;\n'
 assert doc.count(a)==1
 doc=doc.replace(a, a+'  if (S.needLogin) { showLogin(); return; }\n',1)
 # sanity

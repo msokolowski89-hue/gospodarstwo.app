@@ -132,6 +132,21 @@ tfoot td { font-weight: 700; border-bottom: 0; }
 #status { font-size: 13px; color: var(--muted); }
 #status.bad { color: var(--bad-ink); }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 8px 16px; border-radius: 6px; font-weight: 600; z-index: 30; }
+nav.tabs .sep { flex: none; width: 1px; margin: 8px 6px; background: var(--line); }
+.todo { padding: 12px 14px; display: grid; gap: 8px; }
+.todo ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; max-height: 260px; overflow-y: auto; }
+.todo li { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; padding: 5px 6px; border-radius: 5px; cursor: pointer; }
+.todo li:hover { background: var(--accent-soft, var(--c0)); }
+.todo .td-d { font: 500 13px var(--f-data); min-width: 84px; color: var(--muted); }
+.todo .td-d.late { color: var(--bad-ink); font-weight: 600; }
+.hist { display: grid; gap: 2px; max-height: 220px; overflow-y: auto; border: 1px solid var(--line); border-radius: 6px; padding: 4px; }
+.hist button { all: unset; cursor: pointer; display: flex; gap: 10px; padding: 5px 6px; border-radius: 4px; font-size: 14px; }
+.hist button:hover, .hist button:focus-visible { background: var(--c0); }
+.hist button span { font: 500 13px var(--f-data); color: var(--muted); min-width: 80px; }
+.milk-row { display: grid; grid-template-columns: minmax(0, 1.5fr) repeat(4, minmax(0, 1fr)); gap: 6px; align-items: center; }
+.milk-row input { padding: 5px 6px; }
+.milk-head span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.tmr-row { display: grid; grid-template-columns: minmax(0, 2fr) 90px 30px; gap: 6px; align-items: center; }
 @media (max-width: 560px) { .row3 { grid-template-columns: 1fr 1fr; } th, td { padding: 6px 8px; } }
 @media (prefers-reduced-motion: no-preference) { .drawer { animation: slide .18s ease-out; } @keyframes slide { from { transform: translateX(24px); opacity: .6 } } }
 </style>
@@ -140,7 +155,7 @@ tfoot td { font-weight: 700; border-bottom: 0; }
   <header class="top">
     <div class="brand">
       <h1>Zarządzanie gospodarstwem</h1>
-      <p>Pola, uprawy i zabiegi agrotechniczne według sezonów</p>
+      <p>Pola, uprawy, zabiegi agrotechniczne i stado krów</p>
     </div>
     <div class="actions">
       <div class="quick" id="quick" hidden>
@@ -160,6 +175,11 @@ tfoot td { font-weight: 700; border-bottom: 0; }
     <a href="#zabiegi" data-view="zabiegi">Zabiegi</a>
     <a href="#plodozmian" data-view="plodozmian">Płodozmian</a>
     <a href="#podsumowanie" data-view="podsumowanie">Podsumowanie</a>
+    <span class="sep" aria-hidden="true"></span>
+    <a href="#stado" data-view="stado">Stado</a>
+    <a href="#rozrod" data-view="rozrod">Rozród</a>
+    <a href="#mleko" data-view="mleko">Mleko i pasze</a>
+    <a href="#leczenie" data-view="leczenie">Leczenie</a>
   </nav>
 
   <div id="status" role="status">Wczytywanie danych gospodarstwa…</div>
@@ -181,7 +201,9 @@ const JEDN = ["kg","t","l","m³","szt.","j.s.","ha"];
 const STATUS = ["Plan","W trakcie","Zrealizowane"];
 const N_ORG_LIMIT = 170;
 
-const S = { pola: new Map(), uprawy: new Map(), zabiegi: new Map(), loaded: { pola:false, uprawy:false, zabiegi:false }, canWrite: true, rok: null, view: "pola", f: { pole:"", rodzaj:"", q:"" } };
+const COLS = ["pola", "uprawy", "zabiegi", "krowy", "rozrod", "mleko", "leczenie", "ustawienia"];
+const HERD_COLS = ["krowy", "rozrod", "mleko", "leczenie", "ustawienia"];
+const S = { ...Object.fromEntries(COLS.map(c => [c, new Map()])), loaded: Object.fromEntries(COLS.map(c => [c, false])), canWrite: true, rok: null, view: "pola", f: { pole:"", rodzaj:"", q:"", kst:"aktywne", kq:"", rtyp:"" } };
 let db = null, downloads = null;
 const $ = (s, el = document) => el.querySelector(s);
 const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
@@ -236,10 +258,12 @@ function render() {
   const sel = $("#rok"); const want = ys.map(y => `<option value="${y}"${y === S.rok ? " selected" : ""}>${sez(y)}</option>`).join("");
   if (sel.innerHTML !== want) sel.innerHTML = want;
   sel.value = S.rok;
-  $("#quick").hidden = !db || !S.canWrite;
+  const herd = HERD.has(S.view);
+  $("#quick").hidden = !db || !S.canWrite || herd;
+  $(".yearbox").hidden = herd;
   const v = $("#view");
-  if (allLoaded && !S.pola.size) { v.innerHTML = emptyState(); return; }
-  v.innerHTML = ({ pola: vPola, uprawy: vUprawy, zabiegi: vZabiegi, plodozmian: vPlodozmian, podsumowanie: vPodsum }[S.view] || vPola)();
+  if (allLoaded && !S.pola.size && !herd) { v.innerHTML = emptyState(); return; }
+  v.innerHTML = ({ pola: vPola, uprawy: vUprawy, zabiegi: vZabiegi, plodozmian: vPlodozmian, podsumowanie: vPodsum, stado: vStado, rozrod: vRozrod, mleko: vMleko, leczenie: vLeczenie }[S.view] || vPola)();
 }
 function emptyState() {
   return `<div class="panel" style="padding:24px;display:grid;gap:10px;max-width:60ch">
@@ -627,6 +651,316 @@ function formZab(id) {
   zabFormMode(); syncRos();
 }
 
+/* ---------- stado ---------- */
+const HERD = new Set(["stado", "rozrod", "mleko", "leczenie"]);
+const KROWA_ST = ["Dojna", "Zasuszona", "Jałówka", "Cielę", "Byk / opas", "Sprzedana", "Padła"];
+const ROZ_TYP = ["Ruja", "Inseminacja", "Badanie cielności", "Zasuszenie", "Wycielenie", "Poronienie"];
+const CIAZA = 282, ZASUSZ = 60, RUJA = 21, BADANIE = 35, SPOCZYNEK = 50;
+const aktywna = k => !["Sprzedana", "Padła"].includes(k?.status);
+const isoLocal = d => new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
+const TODAY = () => isoLocal(new Date());
+const addDays = (s, n) => { const d = new Date(s + "T12:00:00"); d.setDate(d.getDate() + n); return isoLocal(d); };
+const dDiff = (a, b) => Math.round((new Date(b + "T12:00:00") - new Date(a + "T12:00:00")) / 864e5);
+const isDate = s => /^\d{4}-\d{2}-\d{2}$/.test(s || "");
+const kNr = k => k ? String(k.nr || String(k.kolczyk || "").replace(/\s/g, "").slice(-4)) : "";
+const kName = id => { const k = S.krowy.get(id); return k ? `${kNr(k)}${k.imie ? " " + k.imie : ""}` : (id || "–"); };
+const ST_ORD = s => { const i = KROWA_ST.indexOf(s); return i < 0 ? 9 : i; };
+const krowySorted = all => [...S.krowy.entries()].filter(([, k]) => all || aktywna(k))
+  .sort((a, b) => ST_ORD(a[1].status) - ST_ORD(b[1].status) || kNr(a[1]).localeCompare(kNr(b[1]), "pl", { numeric: true }));
+const wiek = ur => { if (!isDate(ur)) return ""; const m = Math.floor(dDiff(ur, TODAY()) / 30.44); return m < 24 ? `${m} mies.` : `${fmt(m / 12, 1)} r.`; };
+const stPill = s => { const c = { "Dojna": "done", "Zasuszona": "plan", "Jałówka": "trwa", "Cielę": "trwa", "Padła": "bad" }[s];
+  return s ? `<span class="pill ${c || ""}"${c ? "" : ' style="background:var(--line);color:var(--ink)"'}>${esc(s)}</span>` : ""; };
+const krowaOpts = sel => `<option value=""></option>` + [...S.krowy.entries()].filter(([id, k]) => aktywna(k) || id === sel)
+  .sort((a, b) => kNr(a[1]).localeCompare(kNr(b[1]), "pl", { numeric: true }))
+  .map(([id, k]) => `<option value="${esc(id)}"${id === sel ? " selected" : ""}>${esc(kNr(k))}${k.imie ? " " + esc(k.imie) : ""} · ${esc(k.kolczyk || "")}${k.status ? " (" + esc(k.status) + ")" : ""}</option>`).join("");
+
+function cowRepro(id) {
+  const k = S.krowy.get(id) || {}, t = TODAY();
+  const ev = [...S.rozrod.values()].filter(e => e.krowa === id && isDate(e.data)).sort((a, b) => a.data.localeCompare(b.data));
+  let lastCalv = isDate(k.wycielenie) ? k.wycielenie : "";
+  for (const e of ev) if (e.typ === "Wycielenie" && e.data > lastCalv) lastCalv = e.data;
+  const after = ev.filter(e => !lastCalv || e.data > lastCalv);
+  const last = typ => after.filter(e => e.typ === typ).at(-1);
+  const ins = after.filter(e => e.typ === "Inseminacja"), lastIns = ins.at(-1);
+  const bad = last("Badanie cielności"), abort = last("Poronienie"), dry = last("Zasuszenie");
+  let cielna;                                   // true = cielna, null = po inseminacji (niezbadana), false = niecielna, undefined = pusta
+  if (lastIns && !(abort && abort.data >= lastIns.data)) cielna = bad && bad.data >= lastIns.data ? bad.wynik === "Cielna" : null;
+  else if (lastIns) cielna = false;
+  const r = { lastCalv, dim: lastCalv ? dDiff(lastCalv, t) : null, lastIns, insCount: ins.length, cielna, dry };
+  if (lastIns && cielna !== false) { r.wyc = addDays(lastIns.data, CIAZA); r.zas = addDays(r.wyc, -ZASUSZ); r.bad = addDays(lastIns.data, BADANIE); }
+  const lastHeat = after.filter(e => e.typ === "Ruja" || e.typ === "Inseminacja").at(-1);
+  if (lastHeat && cielna !== true && !["Zasuszona", "Cielę", "Byk / opas"].includes(k.status)) {
+    if (cielna === null) { if (dDiff(lastIns.data, t) <= RUJA + 3) r.nextRuja = addDays(lastIns.data, RUJA); }   // po inseminacji: tylko pierwszy możliwy nawrót
+    else { const n = Math.max(1, Math.ceil((dDiff(lastHeat.data, t) - 3) / RUJA)); r.nextRuja = addDays(lastHeat.data, n * RUJA); }
+  }
+  return r;
+}
+function reproTxt(r, k) {
+  if (["Cielę", "Byk / opas"].includes(k.status)) return "";
+  if (r.cielna === true) return `<span class="pill done">Cielna</span> <span class="sub">ins. ${dPL(r.lastIns.data)}</span>`;
+  if (r.cielna === null) return `<span class="pill trwa">Po inseminacji</span> <span class="sub">${dPL(r.lastIns.data)}${r.insCount > 1 ? `, ${r.insCount}. ins.` : ""}</span>`;
+  if (r.cielna === false) return `<span class="pill bad">Niecielna</span>`;
+  return `<span class="sub">pusta</span>`;
+}
+const lekEnd = l => { const od = isDate(l.koniec) ? l.koniec : l.data; const f = v => (isDate(od) && num(v) !== null) ? addDays(od, num(v)) : "";
+  return { mleko: f(l.karMleko), mieso: f(l.karMieso) }; };
+function karencja(id) {
+  const t = TODAY(), r = { mleko: "", mieso: "" };
+  for (const l of S.leczenie.values()) { if (l.krowa !== id) continue; const e = lekEnd(l);
+    if (e.mleko >= t && e.mleko > r.mleko) r.mleko = e.mleko; if (e.mieso >= t && e.mieso > r.mieso) r.mieso = e.mieso; }
+  return r;
+}
+function herdTodo() {
+  const t = TODAY(), out = [];
+  for (const [id, k] of krowySorted()) {
+    const r = cowRepro(id);
+    if (r.zas && r.cielna !== false && k.status === "Dojna" && !r.dry && r.zas <= addDays(t, 14)) out.push({ d: r.zas, id, txt: "Zasuszyć", cls: "plan" });
+    if (r.wyc && r.cielna !== false && r.wyc <= addDays(t, 21) && r.wyc >= addDays(t, -30)) out.push({ d: r.wyc, id, txt: "Przewidywane wycielenie", cls: "trwa" });
+    if (r.cielna === null && r.bad <= addDays(t, 3)) out.push({ d: r.bad, id, txt: "Zbadać cielność", cls: "plan" });
+    if (r.nextRuja && Math.abs(dDiff(t, r.nextRuja)) <= 3) out.push({ d: r.nextRuja, id, txt: "Obserwować ruję", cls: "trwa" });
+    if (k.status === "Dojna" && !r.lastIns && r.dim !== null && r.dim >= SPOCZYNEK) out.push({ d: addDays(r.lastCalv, SPOCZYNEK), id, txt: `Do inseminacji (${r.dim} dni po wycieleniu)`, cls: "bad" });
+  }
+  for (const l of S.leczenie.values()) { const e = lekEnd(l);
+    if (e.mleko >= t) out.push({ d: e.mleko, id: l.krowa, txt: `Karencja na mleko do ${dPL(e.mleko)}${l.lek ? " – " + l.lek : ""}`, cls: "bad" });
+    else if (e.mieso >= t) out.push({ d: e.mieso, id: l.krowa, txt: `Karencja na mięso do ${dPL(e.mieso)}${l.lek ? " – " + l.lek : ""}`, cls: "plan" }); }
+  return out.sort((a, b) => a.d.localeCompare(b.d));
+}
+function todoPanel() {
+  const list = herdTodo(), t = TODAY();
+  const rows = list.map(x => { const late = x.d < t;
+    return `<li tabindex="0" data-act="edit-krowa" data-id="${esc(x.id)}"><span class="td-d${late ? " late" : ""}">${dPL(x.d)}</span><b>${esc(kName(x.id))}</b><span class="pill ${x.cls}">${esc(x.txt)}</span></li>`; }).join("");
+  return `<div class="panel todo"><b>Do zrobienia</b>${rows ? `<ul>${rows}</ul>` : `<p class="empty" style="margin:0">Nic pilnego w najbliższych dniach.</p>`}</div>`;
+}
+const PASZA_DEF = { tmrLitry: 22, litrNaKg: 2, maxKg: 8, krok: 0.5, tmr: [
+  { nazwa: "Kiszonka z kukurydzy", kg: null }, { nazwa: "Kiszonka z traw", kg: null }, { nazwa: "Młóto browarniane kiszone", kg: null },
+  { nazwa: "Ziarno kukurydzy", kg: null }, { nazwa: "Słoma", kg: null }, { nazwa: "Etos podstawa", kg: 6 }] };
+const pasza = () => ({ ...PASZA_DEF, ...(S.ustawienia.get("stado") || {}) });
+const forte = l => { if (l === null || l === undefined) return null; const p = pasza(); const kg = Math.max(0, (l - p.tmrLitry) / p.litrNaKg);
+  return Math.min(p.maxKg, Math.round(kg / p.krok) * p.krok); };
+function lastMilkMap() { const m = new Map(); for (const x of S.mleko.values()) { const c = m.get(x.krowa); if (!c || (x.data || "") > (c.data || "")) m.set(x.krowa, x); } return m; }
+const herdErr = () => S.herdErr ? `<div class="panel" style="padding:14px 16px;border-color:var(--bad-ink)"><b class="err">Brak dostępu do danych stada.</b>
+  <p class="sub" style="margin:4px 0 0">Reguły bazy Firebase nie pozwalają jeszcze zapisywać krów, rozrodu, mleka i leczenia. Trzeba dopisać nowe kolekcje w regułach Firestore (instrukcja w README, krok 2).</p></div>` : "";
+
+function vStado() {
+  const q = (S.f.kq || "").trim().toLowerCase(), fs = S.f.kst || "aktywne", lm = lastMilkMap();
+  const list = krowySorted(true).filter(([, k]) => (fs === "wszystkie" || (fs === "aktywne" ? aktywna(k) : k.status === fs))
+    && (!q || [k.kolczyk, k.nr, k.imie, k.grupa, k.rasa, k.uwagi].join(" ").toLowerCase().includes(q)));
+  const cnt = st => [...S.krowy.values()].filter(k => k.status === st).length;
+  const body = list.map(([id, k]) => { const r = cowRepro(id), m = lm.get(id), kar = karencja(id);
+    return `<tr class="click" data-act="edit-krowa" data-id="${esc(id)}">
+      <td class="pole">${esc(kNr(k))}${k.imie ? " " + esc(k.imie) : ""}<div class="sub">${esc(k.kolczyk || "")}</div></td>
+      <td>${stPill(k.status)}</td><td>${wiek(k.urodzenie)}</td><td class="num">${k.laktacja ?? ""}</td>
+      <td class="num">${r.dim !== null && ["Dojna", "Zasuszona"].includes(k.status) ? r.dim : ""}</td>
+      <td>${reproTxt(r, k)}</td><td>${r.wyc && r.cielna !== false ? dPL(r.wyc) : ""}</td>
+      <td class="num">${m && k.status === "Dojna" ? fmt(num(m.litry), 1) : ""}</td>
+      <td>${kar.mleko ? `<span class="pill bad" title="Karencja na mleko do ${dPL(kar.mleko)}">mleko do ${dPL(kar.mleko).slice(0, 5)}</span>` : kar.mieso ? `<span class="pill plan">mięso do ${dPL(kar.mieso).slice(0, 5)}</span>` : ""}</td>
+      <td class="wrap" title="${esc(k.uwagi || "")}">${esc(k.uwagi || "")}</td></tr>`; }).join("");
+  const fOpts = [["aktywne", "Aktywne zwierzęta"], ["wszystkie", "Wszystkie (też sprzedane)"], ...KROWA_ST.map(s => [s, s])]
+    .map(([v, l]) => `<option value="${esc(v)}"${fs === v ? " selected" : ""}>${esc(l)}</option>`).join("");
+  return `<div style="display:grid;gap:14px">${herdErr()}
+    <div class="stats"><div class="stat"><b>${[...S.krowy.values()].filter(aktywna).length}</b><span>zwierząt w stadzie</span></div>
+      <div class="stat"><b>${cnt("Dojna")}</b><span>dojnych</span></div><div class="stat"><b>${cnt("Zasuszona")}</b><span>zasuszonych</span></div>
+      <div class="stat"><b>${cnt("Jałówka")}</b><span>jałówek</span></div><div class="stat"><b>${cnt("Cielę")}</b><span>cieląt</span></div></div>
+    ${S.krowy.size ? todoPanel() : ""}
+    <div class="toolbar"><select id="f-kst" aria-label="Filtr statusu">${fOpts}</select>
+      <input id="f-kq" class="grow" type="search" placeholder="Szukaj numeru, kolczyka, imienia…" value="${esc(S.f.kq || "")}" aria-label="Szukaj krowy">
+      ${S.canWrite ? `<button data-act="new-roz">Zdarzenie rozrodu</button><button class="primary" data-act="new-krowa">Dodaj zwierzę</button>` : ""}</div>
+    <div class="panel scroll"><table><thead><tr><th>Nr / imię</th><th>Status</th><th>Wiek</th><th class="num">Lakt.</th><th class="num">Dni laktacji</th>
+      <th>Rozród</th><th>Wycielenie (przewid.)</th><th class="num">Mleko l/d</th><th>Karencja</th><th>Uwagi</th></tr></thead>
+    <tbody>${body || `<tr><td colspan="10" class="empty">${S.krowy.size ? "Brak zwierząt dla wybranego filtra." : "Nie ma jeszcze zwierząt. Dodaj pierwsze albo zaimportuj listę stada."}</td></tr>`}</tbody></table></div></div>`;
+}
+function vRozrod() {
+  const ft = S.f.rtyp || "";
+  const list = [...S.rozrod.entries()].filter(([, e]) => !ft || e.typ === ft).sort((a, b) => (b[1].data || "").localeCompare(a[1].data || ""));
+  const cielne = krowySorted().map(([id, k]) => ({ id, k, r: cowRepro(id) })).filter(x => x.r.wyc && x.r.cielna !== false).sort((a, b) => a.r.wyc.localeCompare(b.r.wyc));
+  const body = list.map(([eid, e]) => `<tr class="click" data-act="edit-roz" data-id="${esc(eid)}"><td>${dPL(e.data)}</td><td class="pole">${esc(kName(e.krowa))}</td>
+    <td>${esc(e.typ || "")}</td><td>${esc([e.buhaj, e.wynik, e.cielKolczyk ? "cielę " + e.cielKolczyk + (e.cielPlec ? " (" + e.cielPlec + ")" : "") : ""].filter(Boolean).join(", "))}</td>
+    <td class="wrap" title="${esc(e.uwagi || "")}">${esc(e.uwagi || "")}</td></tr>`).join("");
+  const cBody = cielne.map(({ id, k, r }) => `<tr class="click" data-act="edit-krowa" data-id="${esc(id)}"><td class="pole">${esc(kName(id))}</td><td>${reproTxt(r, k)}</td>
+    <td>${r.lastIns.buhaj ? esc(r.lastIns.buhaj) : ""}</td><td>${dPL(r.bad)}</td><td>${k.status === "Dojna" ? dPL(r.zas) : ""}</td><td><b>${dPL(r.wyc)}</b></td></tr>`).join("");
+  const tOpts = `<option value="">Wszystkie zdarzenia</option>` + ROZ_TYP.map(t => `<option${ft === t ? " selected" : ""}>${t}</option>`).join("");
+  return `<div style="display:grid;gap:14px">${herdErr()}${todoPanel()}
+    <p class="sub" style="margin:0">Terminy liczone od ostatniej inseminacji: badanie cielności po ${BADANIE} dniach, wycielenie po ${CIAZA} dniach, zasuszenie ${ZASUSZ} dni przed wycieleniem, kolejna ruja co ${RUJA} dni.</p>
+    <div class="panel scroll"><table><thead><tr><th>Krowa / jałówka</th><th>Stan</th><th>Buhaj</th><th>Badanie</th><th>Zasuszenie</th><th>Wycielenie</th></tr></thead>
+      <tbody>${cBody || `<tr><td colspan="6" class="empty">Brak zwierząt po inseminacji.</td></tr>`}</tbody></table></div>
+    <div class="toolbar"><select id="f-rtyp" aria-label="Filtr zdarzeń">${tOpts}</select><div class="grow"></div>
+      ${S.canWrite ? `<button class="primary" data-act="new-roz">Dodaj zdarzenie</button>` : ""}</div>
+    <div class="panel scroll"><table><thead><tr><th>Data</th><th>Zwierzę</th><th>Zdarzenie</th><th>Szczegóły</th><th>Uwagi</th></tr></thead>
+      <tbody>${body || `<tr><td colspan="5" class="empty">Brak zapisanych zdarzeń.</td></tr>`}</tbody></table></div></div>`;
+}
+function vMleko() {
+  const p = pasza(), lm = lastMilkMap();
+  const dojne = krowySorted().filter(([, k]) => k.status === "Dojna");
+  let sumL = 0, nL = 0, sumF = 0;
+  const body = dojne.map(([id, k]) => { const m = lm.get(id), l = m ? num(m.litry) : null, f = forte(l), r = cowRepro(id), kar = karencja(id);
+    if (l !== null) { sumL += l; nL++; } if (f) sumF += f;
+    return `<tr class="click" data-act="edit-krowa" data-id="${esc(id)}"><td class="pole">${esc(kName(id))}</td><td class="num">${r.dim ?? ""}</td>
+      <td>${m ? dPL(m.data) : `<span class="empty">brak</span>`}</td><td class="num">${fmt(l, 1)}</td><td class="num">${fmt(num(m?.tluszcz), 2)}</td>
+      <td class="num">${fmt(num(m?.bialko), 2)}</td><td class="num">${fmt(num(m?.scc), 0)}</td>
+      <td class="num"><b>${f === null ? "" : fmt(f, 1)}</b></td><td>${kar.mleko ? `<span class="pill bad">nie do zbiornika</span>` : ""}</td></tr>`; }).join("");
+  const tmrSum = (p.tmr || []).reduce((a, x) => a + (num(x.kg) || 0), 0);
+  const tmrBody = (p.tmr || []).map(x => `<tr><td>${esc(x.nazwa)}</td><td class="num">${x.kg === null || x.kg === "" ? `<span class="empty">–</span>` : fmt(num(x.kg), 1)}</td>
+    <td class="num">${num(x.kg) ? fmt(num(x.kg) * dojne.length, 0) : ""}</td></tr>`).join("");
+  return `<div style="display:grid;gap:14px">${herdErr()}
+    <div class="stats"><div class="stat"><b>${dojne.length}</b><span>krów dojnych</span></div>
+      <div class="stat"><b>${nL ? fmt(sumL / nL, 1) : "–"} l</b><span>średnio na krowę / dzień</span></div>
+      <div class="stat"><b>${fmt(sumL, 0) || "–"} l</b><span>mleka dziennie (ostatnie pomiary)</span></div>
+      <div class="stat"><b>${fmt(sumF, 1) || "0"} kg</b><span>Forte Etos dziennie</span></div></div>
+    <div class="toolbar"><span class="sub">Forte Etos: ${fmt(p.litrNaKg, 1)} l mleka na 1 kg powyżej ${fmt(p.tmrLitry, 0)} l z TMR, najwyżej ${fmt(p.maxKg, 1)} kg.</span><div class="grow"></div>
+      ${S.canWrite ? `<button data-act="pasza">Ustawienia paszy</button><button class="primary" data-act="new-mleko">Wpisz udój</button>` : ""}</div>
+    <div class="panel scroll"><table><thead><tr><th>Krowa</th><th class="num">Dni lakt.</th><th>Pomiar</th><th class="num">Mleko l/d</th><th class="num">Tłuszcz %</th>
+      <th class="num">Białko %</th><th class="num">Kom. som. tys.</th><th class="num">Forte kg/d</th><th></th></tr></thead>
+      <tbody>${body || `<tr><td colspan="9" class="empty">Brak krów ze statusem „Dojna”.</td></tr>`}</tbody></table></div>
+    <div class="panel scroll"><div style="padding:12px 14px 0"><b>Dawka TMR</b> <span class="sub">na krowę dojną, kg świeżej masy</span></div>
+      <table><thead><tr><th>Składnik</th><th class="num">kg / krowę</th><th class="num">kg na ${dojne.length} krów</th></tr></thead>
+      <tbody>${tmrBody}</tbody><tfoot><tr><td>Razem</td><td class="num">${fmt(tmrSum, 1)}</td><td class="num">${fmt(tmrSum * dojne.length, 0)}</td></tr></tfoot></table>
+      ${(p.tmr || []).some(x => x.kg === null || x.kg === "") ? `<p class="note" style="padding-top:8px">Uzupełnij ilości składników w „Ustawieniach paszy”, a policzę załadunek wozu.</p>` : ""}</div></div>`;
+}
+function vLeczenie() {
+  const t = TODAY();
+  const list = [...S.leczenie.entries()].sort((a, b) => (b[1].data || "").localeCompare(a[1].data || ""));
+  let akt = 0;
+  const body = list.map(([lid, l]) => { const e = lekEnd(l), on = e.mleko >= t || e.mieso >= t; if (on) akt++;
+    return `<tr class="click" data-act="edit-lecz" data-id="${esc(lid)}"><td>${dPL(l.data)}${isDate(l.koniec) && l.koniec !== l.data ? `<div class="sub">do ${dPL(l.koniec)}</div>` : ""}</td>
+      <td class="pole">${esc(kName(l.krowa))}</td><td style="white-space:normal;min-width:140px">${esc(l.choroba || "")}</td>
+      <td style="white-space:normal;min-width:140px">${esc(l.lek || "")}${l.dawka ? `<div class="sub">${esc(l.dawka)}</div>` : ""}</td>
+      <td>${e.mleko ? (e.mleko >= t ? `<span class="pill bad">${dPL(e.mleko)}</span>` : dPL(e.mleko)) : ""}</td>
+      <td>${e.mieso ? (e.mieso >= t ? `<span class="pill plan">${dPL(e.mieso)}</span>` : dPL(e.mieso)) : ""}</td>
+      <td>${esc(l.lekarz || "")}</td><td class="wrap" title="${esc(l.uwagi || "")}">${esc(l.uwagi || "")}</td></tr>`; }).join("");
+  return `<div style="display:grid;gap:14px">${herdErr()}
+    <div class="stats"><div class="stat"><b>${list.length}</b><span>wpisów leczenia</span></div><div class="stat"><b>${akt}</b><span>trwających karencji</span></div></div>
+    <div class="toolbar"><span class="sub">Karencja liczy się od ostatniego podania leku.</span><div class="grow"></div>${S.canWrite ? `<button class="primary" data-act="new-lecz">Dodaj leczenie</button>` : ""}</div>
+    <div class="panel scroll"><table><thead><tr><th>Data</th><th>Zwierzę</th><th>Choroba / rozpoznanie</th><th>Lek, dawka</th><th>Karencja mleko</th><th>Karencja mięso</th><th>Lekarz</th><th>Uwagi</th></tr></thead>
+      <tbody>${body || `<tr><td colspan="8" class="empty">Brak wpisów leczenia.</td></tr>`}</tbody></table></div></div>`;
+}
+
+/* ----- formularze stada ----- */
+const sel = (id, label, list, v) => `<div class="f"><label for="${id}">${label}</label><select id="${id}">${opt(list, v)}</select></div>`;
+function formKrowa(id) {
+  const k = id ? S.krowy.get(id) : { status: "Dojna" };
+  let extra = "";
+  if (id) {
+    const r = cowRepro(id), kar = karencja(id);
+    const hist = [...[...S.rozrod.entries()].filter(([, e]) => e.krowa === id).map(([eid, e]) => ({ d: e.data || "", t: e.typ + (e.buhaj ? ` – ${e.buhaj}` : "") + (e.wynik ? `: ${e.wynik}` : ""), act: "edit-roz", eid })),
+      ...[...S.leczenie.entries()].filter(([, l]) => l.krowa === id).map(([lid, l]) => ({ d: l.data || "", t: `Leczenie: ${[l.choroba, l.lek].filter(Boolean).join(" – ")}`, act: "edit-lecz", eid: lid }))]
+      .sort((a, b) => b.d.localeCompare(a.d));
+    const ml = [...S.mleko.values()].filter(m => m.krowa === id).sort((a, b) => (b.data || "").localeCompare(a.data || "")).slice(0, 6);
+    const info = [r.dim !== null ? `${r.dim} dni od wycielenia` : "", r.wyc && r.cielna !== false ? `wycielenie ok. ${dPL(r.wyc)}` : "", r.zas && r.cielna !== false && k.status === "Dojna" ? `zasuszenie ${dPL(r.zas)}` : "",
+      r.nextRuja ? `ruja ok. ${dPL(r.nextRuja)}` : "", kar.mleko ? `karencja mleko do ${dPL(kar.mleko)}` : ""].filter(Boolean).join(" · ");
+    extra = `<div class="f"><label>Stan</label><div>${reproTxt(r, k)}${info ? ` <span class="sub">${esc(info)}</span>` : ""}</div></div>
+      <div class="f"><label>Historia</label>
+        <div class="hist">${hist.map(h => `<button type="button" data-act="${h.act}" data-id="${esc(h.eid)}"><span>${dPL(h.d)}</span>${esc(h.t)}</button>`).join("") || `<span class="empty">Brak zdarzeń.</span>`}</div>
+        ${S.canWrite ? `<div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" data-act="new-roz" data-krowa="${esc(id)}">+ Rozród</button><button type="button" data-act="new-lecz" data-krowa="${esc(id)}">+ Leczenie</button></div>` : ""}</div>
+      ${ml.length ? `<div class="f"><label>Ostatnie pomiary mleka</label><div class="sub">${ml.map(m => `${dPL(m.data)}: <b>${fmt(num(m.litry), 1)} l</b>`).join(" · ")}</div></div>` : ""}`;
+  }
+  openDrawer(id ? `${kNr(k)} ${k.imie || ""}`.trim() : "Nowe zwierzę", `
+    <div class="row2">${inp("k-kol", "Nr kolczyka", k.kolczyk, "text", 'required placeholder="PL005…"')}${inp("k-nr", "Nr w oborze", k.nr, "text", 'placeholder="np. 4 ostatnie cyfry"')}</div>
+    <div class="row2">${inp("k-imie", "Imię", k.imie)}${sel("k-st", "Status", KROWA_ST, k.status)}</div>
+    <div class="row3">${inp("k-ur", "Data urodzenia", k.urodzenie, "date")}${inp("k-rasa", "Rasa", k.rasa)}${inp("k-gr", "Grupa / kojec", k.grupa)}</div>
+    <div class="row2">${inp("k-lakt", "Nr laktacji", k.laktacja, "text", 'inputmode="numeric"')}${inp("k-wyc", "Ostatnie wycielenie", k.wycielenie, "date")}</div>
+    <div class="row2">${inp("k-matka", "Matka (kolczyk)", k.matka)}${inp("k-ojciec", "Ojciec (buhaj)", k.ojciec)}</div>
+    <div class="f"><label for="k-uw">Uwagi</label><textarea id="k-uw" rows="2">${esc(k.uwagi || "")}</textarea></div>${extra}`,
+  async () => {
+    const kol = val("k-kol").toUpperCase().replace(/\s+/g, ""); if (!kol) throw "Wpisz numer kolczyka.";
+    const key = id || slug(kol);
+    if (!id && S.krowy.has(key)) throw "Zwierzę o tym numerze kolczyka już jest w kartotece.";
+    await db.collection("krowy").doc(key).set({ kolczyk: kol, nr: val("k-nr"), imie: val("k-imie"), status: val("k-st") || "Dojna", urodzenie: val("k-ur"), rasa: val("k-rasa"), grupa: val("k-gr"),
+      laktacja: num(val("k-lakt")), wycielenie: val("k-wyc"), matka: val("k-matka").toUpperCase(), ojciec: val("k-ojciec"), uwagi: val("k-uw") });
+    return id ? "Zapisano zwierzę" : "Dodano zwierzę";
+  }, id ? async () => { await db.collection("krowy").doc(id).delete(); return "Usunięto zwierzę z kartoteki"; } : null);
+}
+function formRoz(id, krowa, typ) {
+  const e = id ? S.rozrod.get(id) : { krowa: krowa || "", data: TODAY(), typ: typ || "Inseminacja" };
+  openDrawer(id ? "Zdarzenie rozrodu" : "Nowe zdarzenie rozrodu", `
+    <div class="f"><label for="r-krowa">Zwierzę</label><select id="r-krowa">${krowaOpts(e.krowa)}</select></div>
+    <div class="row2">${inp("r-data", "Data", e.data, "date")}${sel("r-typ", "Zdarzenie", ROZ_TYP, e.typ)}</div>
+    <div id="r-ins">${inp("r-buhaj", "Buhaj (nazwa / nr)", e.buhaj, "text", 'list="dl-buhaje"')}<datalist id="dl-buhaje">${[...new Set([...S.rozrod.values()].map(x => x.buhaj).filter(Boolean))].map(b => `<option value="${esc(b)}"></option>`).join("")}</datalist></div>
+    <div id="r-bad">${sel("r-wynik", "Wynik badania", ["Cielna", "Niecielna"], e.wynik)}</div>
+    <div id="r-wyc" style="display:grid;gap:12px"><div class="row2">${inp("r-ckol", "Kolczyk cielęcia", e.cielKolczyk)}${sel("r-cplec", "Płeć cielęcia", ["Jałówka", "Byczek"], e.cielPlec)}</div>
+      ${sel("r-przeb", "Przebieg wycielenia", ["Samodzielne", "Z pomocą", "Trudne / lekarz", "Martwe cielę"], e.przebieg)}
+      ${id ? "" : `<span class="hint">Po zapisie krowa dostanie status „Dojna”, nowy numer laktacji, a cielę z kolczykiem trafi do kartoteki.</span>`}</div>
+    <div class="f"><label for="r-uw">Uwagi</label><textarea id="r-uw" rows="2">${esc(e.uwagi || "")}</textarea></div>`,
+  async () => {
+    const k = val("r-krowa"); if (!k) throw "Wybierz zwierzę."; const d = val("r-data"); if (!isDate(d)) throw "Wpisz datę.";
+    const t = val("r-typ"); if (!t) throw "Wybierz rodzaj zdarzenia.";
+    const doc = { krowa: k, data: d, typ: t, buhaj: t === "Inseminacja" ? val("r-buhaj") : "", wynik: t === "Badanie cielności" ? val("r-wynik") : "",
+      cielKolczyk: t === "Wycielenie" ? val("r-ckol").toUpperCase().replace(/\s+/g, "") : "", cielPlec: t === "Wycielenie" ? val("r-cplec") : "", przebieg: t === "Wycielenie" ? val("r-przeb") : "", uwagi: val("r-uw") };
+    if (t === "Badanie cielności" && !doc.wynik) throw "Wybierz wynik badania.";
+    const kr = S.krowy.get(k), insPrzed = cowRepro(k).lastIns;
+    if (id) await db.collection("rozrod").doc(id).set(doc); else await db.collection("rozrod").add(doc);
+    let msg = id ? "Zapisano zdarzenie" : "Dodano zdarzenie";
+    if (!id && kr && t === "Wycielenie") {
+      await db.collection("krowy").doc(k).set({ ...kr, status: "Dojna", laktacja: (num(kr.laktacja) || 0) + 1, wycielenie: d > (kr.wycielenie || "") ? d : kr.wycielenie });
+      if (doc.cielKolczyk && !S.krowy.has(slug(doc.cielKolczyk))) {
+        await db.collection("krowy").doc(slug(doc.cielKolczyk)).set({ kolczyk: doc.cielKolczyk, nr: "", imie: "", status: doc.cielPlec === "Byczek" ? "Byk / opas" : "Cielę", urodzenie: d, rasa: kr.rasa || "", grupa: "",
+          laktacja: null, wycielenie: "", matka: kr.kolczyk || "", ojciec: insPrzed?.buhaj || "", uwagi: doc.cielPlec ? doc.cielPlec : "" });
+        msg += " i cielę";
+      }
+    }
+    if (!id && kr && t === "Zasuszenie" && kr.status === "Dojna") await db.collection("krowy").doc(k).set({ ...kr, status: "Zasuszona" });
+    return msg;
+  }, id ? async () => { await db.collection("rozrod").doc(id).delete(); return "Usunięto zdarzenie"; } : null);
+  rozMode();
+}
+function rozMode() { const t = val("r-typ"); const sh = (i, on) => { const x = document.getElementById(i); if (x) x.hidden = !on; };
+  sh("r-ins", t === "Inseminacja"); sh("r-bad", t === "Badanie cielności"); sh("r-wyc", t === "Wycielenie"); }
+function formLecz(id, krowa) {
+  const l = id ? S.leczenie.get(id) : { krowa: krowa || "", data: TODAY() };
+  openDrawer(id ? "Leczenie" : "Nowe leczenie", `
+    <div class="f"><label for="l-krowa">Zwierzę</label><select id="l-krowa">${krowaOpts(l.krowa)}</select></div>
+    <div class="row2">${inp("l-data", "Początek leczenia", l.data, "date")}${inp("l-kon", "Ostatnie podanie leku", l.koniec, "date")}</div>
+    ${inp("l-ch", "Choroba / rozpoznanie", l.choroba, "text", 'list="dl-chor"')}
+    <datalist id="dl-chor">${["Zapalenie wymienia", "Zatrzymanie łożyska", "Zapalenie macicy", "Gorączka mleczna", "Ketoza", "Przemieszczenie trawieńca", "Kulawizna", "Biegunka cieląt", "Zapalenie płuc", "Torbiele jajników"].map(x => `<option value="${x}"></option>`).join("")}</datalist>
+    <div class="row2">${inp("l-lek", "Lek", l.lek)}${inp("l-daw", "Dawka i sposób podania", l.dawka)}</div>
+    <div class="row3">${inp("l-km", "Karencja mleko (dni)", l.karMleko, "text", 'inputmode="numeric"')}${inp("l-kmi", "Karencja mięso (dni)", l.karMieso, "text", 'inputmode="numeric"')}${inp("l-lek2", "Lekarz wet.", l.lekarz)}</div>
+    <span class="hint">Karencja liczy się od ostatniego podania leku (jeśli puste, od początku leczenia).</span>
+    <div class="f"><label for="l-uw">Uwagi</label><textarea id="l-uw" rows="2">${esc(l.uwagi || "")}</textarea></div>`,
+  async () => {
+    const k = val("l-krowa"); if (!k) throw "Wybierz zwierzę."; if (!isDate(val("l-data"))) throw "Wpisz datę leczenia.";
+    const doc = { krowa: k, data: val("l-data"), koniec: val("l-kon"), choroba: val("l-ch"), lek: val("l-lek"), dawka: val("l-daw"),
+      karMleko: num(val("l-km")), karMieso: num(val("l-kmi")), lekarz: val("l-lek2"), uwagi: val("l-uw") };
+    if (id) await db.collection("leczenie").doc(id).set(doc); else await db.collection("leczenie").add(doc);
+    return id ? "Zapisano leczenie" : "Dodano leczenie";
+  }, id ? async () => { await db.collection("leczenie").doc(id).delete(); return "Usunięto wpis leczenia"; } : null);
+}
+function milkRows(d) {
+  return krowySorted().filter(([, k]) => k.status === "Dojna").map(([id]) => { const m = S.mleko.get(`${id}_${d}`) || {};
+    return `<div class="milk-row" data-k="${esc(id)}"><span class="pole">${esc(kName(id))}</span>
+      <input class="m-l" inputmode="decimal" aria-label="Mleko l" value="${esc(m.litry ?? "")}"><input class="m-t" inputmode="decimal" aria-label="Tłuszcz" value="${esc(m.tluszcz ?? "")}">
+      <input class="m-b" inputmode="decimal" aria-label="Białko" value="${esc(m.bialko ?? "")}"><input class="m-s" inputmode="numeric" aria-label="Komórki" value="${esc(m.scc ?? "")}"></div>`; }).join("");
+}
+function formMleko() {
+  const d = TODAY();
+  openDrawer("Wpisz udój", `${inp("m-data", "Data pomiaru", d, "date")}
+    <div class="f"><div class="milk-row milk-head"><span>Krowa</span><span>Mleko l/d</span><span>Tłuszcz %</span><span>Białko %</span><span>Kom. tys.</span></div>
+      <div id="m-rows" style="display:grid;gap:4px">${milkRows(d) || `<span class="empty">Brak krów ze statusem „Dojna”.</span>`}</div>
+      <span class="hint">Wpisz dzienną wydajność (np. z próbnego udoju). Puste wiersze zostaną pominięte, a wpis z tą samą datą nadpisany.</span></div>`,
+  async () => {
+    const d = val("m-data"); if (!isDate(d)) throw "Wpisz datę pomiaru.";
+    const rows = [...document.querySelectorAll("#m-rows .milk-row")].map(r => ({ krowa: r.dataset.k, data: d, litry: num(r.querySelector(".m-l").value),
+      tluszcz: num(r.querySelector(".m-t").value), bialko: num(r.querySelector(".m-b").value), scc: num(r.querySelector(".m-s").value) })).filter(x => x.litry !== null);
+    if (!rows.length) throw "Wpisz wydajność co najmniej jednej krowy.";
+    for (const x of rows) await db.collection("mleko").doc(`${x.krowa}_${d}`).set(x);
+    return `Zapisano pomiary: ${rows.length}`;
+  });
+}
+const tmrRow = (x = {}) => `<div class="tmr-row"><input class="t-n" aria-label="Składnik" value="${esc(x.nazwa || "")}"><input class="t-kg" inputmode="decimal" aria-label="kg" value="${esc(x.kg ?? "")}"><button type="button" class="ros-del" data-act="tmr-del" aria-label="Usuń">×</button></div>`;
+function formPasza() {
+  const p = pasza();
+  openDrawer("Ustawienia paszy", `
+    <div class="f"><label>Forte Etos na stacji paszowej</label><div class="row3">${inp("pa-tmr", "Mleko z TMR (l)", p.tmrLitry, "text", 'inputmode="decimal"')}${inp("pa-lkg", "Litrów na 1 kg", p.litrNaKg, "text", 'inputmode="decimal"')}${inp("pa-max", "Maks. kg / dzień", p.maxKg, "text", 'inputmode="decimal"')}</div>
+      <span class="hint">Dawka = (mleko − mleko z TMR) ÷ litrów na 1 kg, zaokrąglona do ${fmt(p.krok, 1)} kg.</span></div>
+    <div class="f"><label>Dawka TMR na krowę dojną (kg świeżej masy)</label><div id="tmr-rows" style="display:grid;gap:6px">${(p.tmr || []).map(tmrRow).join("")}</div>
+      <div><button type="button" data-act="tmr-add">+ Dodaj składnik</button></div></div>`,
+  async () => {
+    const tmr = [...document.querySelectorAll("#tmr-rows .tmr-row")].map(r => ({ nazwa: r.querySelector(".t-n").value.trim(), kg: num(r.querySelector(".t-kg").value) })).filter(x => x.nazwa);
+    const v = { tmrLitry: num(val("pa-tmr")), litrNaKg: num(val("pa-lkg")), maxKg: num(val("pa-max")) };
+    if (!v.tmrLitry && v.tmrLitry !== 0 || !v.litrNaKg || !v.maxKg) throw "Uzupełnij wszystkie trzy liczby dla Forte Etos.";
+    await db.collection("ustawienia").doc("stado").set({ ...v, krok: p.krok, tmr });
+    return "Zapisano ustawienia paszy";
+  });
+}
+
 async function exportCsv() {
   const cols = ["Data","Sezon","Pole","Uprawa","Rodzaj","Typ środka","Środek","Dawka/ha","Jednostka","ha","Ilość","Cena","Koszt","N","P2O5","K2O","S","MgO","BBCH","Pogoda","Wykonawca","Uwagi"];
   const q = v => { const s = v === null || v === undefined ? "" : String(v); return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
@@ -647,6 +981,8 @@ document.addEventListener("click", async e => {
   if (a === "close") return closeDrawer();
   if (a === "ros-add") { $("#z-ros").insertAdjacentHTML("beforeend", rosRow()); syncRos(); $("#z-ros .ros-row:last-child .r-gat").focus(); return; }
   if (a === "ros-del") { el.closest(".ros-row").remove(); syncRos(); return; }
+  if (a === "tmr-add") { $("#tmr-rows").insertAdjacentHTML("beforeend", tmrRow()); $("#tmr-rows .tmr-row:last-child .t-n").focus(); return; }
+  if (a === "tmr-del") { el.closest(".tmr-row").remove(); return; }
   if (a === "del") {
     if (!el.classList.contains("armed")) { el.classList.add("armed"); el.textContent = "Kliknij, aby potwierdzić"; return; }
     try { el.disabled = true; toast(await drawerState.onDelete()); closeDrawer(); } catch (err) { $("#ferr").textContent = typeof err === "string" ? err : "Nie udało się usunąć. Spróbuj ponownie."; el.disabled = false; }
@@ -659,10 +995,18 @@ document.addEventListener("click", async e => {
   if (a === "new-zab") formZab(null);
   if (a === "edit-zab") formZab(el.dataset.id);
   if (a === "csv") exportCsv();
+  if (a === "new-krowa") formKrowa(null);
+  if (a === "edit-krowa" && S.krowy.has(el.dataset.id)) formKrowa(el.dataset.id);
+  if (a === "new-roz") formRoz(null, el.dataset.krowa, el.dataset.typ);
+  if (a === "edit-roz") formRoz(el.dataset.id);
+  if (a === "new-lecz") formLecz(null, el.dataset.krowa);
+  if (a === "edit-lecz") formLecz(el.dataset.id);
+  if (a === "new-mleko") formMleko();
+  if (a === "pasza") formPasza();
 });
 document.addEventListener("keydown", e => {
   if (e.key === "Escape" && drawerState) closeDrawer();
-  if ((e.key === "Enter" || e.key === " ") && e.target.matches("td.cell[data-act]")) { e.preventDefault(); e.target.click(); }
+  if ((e.key === "Enter" || e.key === " ") && e.target.matches("td.cell[data-act], .todo li[data-act]")) { e.preventDefault(); e.target.click(); }
 });
 document.addEventListener("submit", async e => {
   if (e.target.id !== "dform") return; e.preventDefault();
@@ -680,12 +1024,17 @@ document.addEventListener("change", e => {
   if (e.target.id === "z-rok" && $("#z-checks")) { const keep = new Set([...document.querySelectorAll('input[name="z-pola"]:checked')].map(x => x.value)); $("#z-checks").innerHTML = polaChecks(+e.target.value, keep); syncChecks(); }
   if (e.target.id === "f-pole") { S.f.pole = e.target.value; render(); }
   if (e.target.id === "f-rodzaj") { S.f.rodzaj = e.target.value; render(); }
+  if (e.target.id === "f-kst") { S.f.kst = e.target.value; render(); }
+  if (e.target.id === "f-rtyp") { S.f.rtyp = e.target.value; render(); }
+  if (e.target.id === "r-typ") rozMode();
+  if (e.target.id === "m-data" && isDate(e.target.value)) $("#m-rows").innerHTML = milkRows(e.target.value);
 });
 document.addEventListener("input", e => {
   if (e.target.matches?.("#z-ros .r-daw")) syncRos();
+  if (e.target.id === "f-kq") { S.f.kq = e.target.value; clearTimeout(S.qt); S.qt = setTimeout(() => { const pos = e.target.selectionStart; render(); const q = $("#f-kq"); if (q) { q.focus(); q.setSelectionRange(pos, pos); } }, 250); }
   if (e.target.id === "f-q") { S.f.q = e.target.value; clearTimeout(S.qt); S.qt = setTimeout(() => { const pos = e.target.selectionStart; render(); const q = $("#f-q"); if (q) { q.focus(); q.setSelectionRange(pos, pos); } }, 250); }
 });
-function route() { const h = location.hash.replace("#", ""); S.view = ["pola","uprawy","zabiegi","plodozmian","podsumowanie"].includes(h) ? h : "pola"; render(); }
+function route() { const h = location.hash.replace("#", ""); S.view = ["pola","uprawy","zabiegi","plodozmian","podsumowanie", ...HERD].includes(h) ? h : "pola"; render(); }
 window.addEventListener("hashchange", route);
 
 /* ---------- start ---------- */
@@ -699,7 +1048,7 @@ route();
   S.canWrite = cw !== false;
   downloads = await window.claude.use("downloads");
   const timer = setTimeout(() => { st.textContent = "Dane jeszcze się nie wczytały. Sprawdź połączenie z internetem."; st.className = "bad"; }, 10000);
-  for (const col of ["pola", "uprawy", "zabiegi"]) {
+  for (const col of COLS) {
     db.collection(col).onSnapshot(snap => {
       const m = new Map(); snap.docs.forEach(d => m.set(d.id, d.data()));
       S[col] = m; if (!snap.metadata.fromCache) S.loaded[col] = true;

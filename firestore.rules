@@ -9,7 +9,7 @@ service cloud.firestore {
         && request.auth.token.email in ['TWOJ_EMAIL@gmail.com'];
     }
     match /{kolekcja}/{dokument} {
-      allow read, write: if uprawniony() && kolekcja in ['pola', 'uprawy', 'zabiegi'];
+      allow read, write: if uprawniony() && kolekcja in ['pola', 'uprawy', 'zabiegi', 'krowy', 'rozrod', 'mleko', 'leczenie', 'ustawienia'];
     }
   }
 }
