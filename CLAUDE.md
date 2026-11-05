@@ -21,6 +21,15 @@ Push wymaga tokenu GitHub z pęku kluczy macOS. Uruchamiaj go w panelu Terminal 
 - `uprawy/{poleId}_{rok}`: `pole, rok, uprawa, odmiana, status (Plan | W trakcie | Zrealizowane), siew, norma, zbior, plon, uwagi`.
 - `zabiegi/{id}`: `data, rok, pole, rodzaj, typ, srodek, dawka, jedn, ha (null = całe pole), cena, bbch, pogoda, wykonawca, uwagi, N, P, K, S, Mg`. Przy siewie dodatkowo `gatunek, odmiana, rosliny: [{gatunek, odmiana, dawka}]`. Zabiegi z eAgronom mają id `ea-RRRR-NNN`.
 
+Stado krów (zakładki Stado, Rozród, Mleko i pasze, Leczenie; lista kolekcji w stałej `COLS`, stado w `HERD_COLS`):
+- `krowy/{slug kolczyka}`: `kolczyk, nr (nr w oborze), imie, status (Dojna | Zasuszona | Jałówka | Cielę | Byk / opas | Sprzedana | Padła), urodzenie, rasa, grupa, laktacja, wycielenie, matka, ojciec, uwagi`.
+- `rozrod/{id}`: `krowa, data, typ (Ruja | Inseminacja | Badanie cielności | Zasuszenie | Wycielenie | Poronienie), buhaj, wynik (Cielna | Niecielna), cielKolczyk, cielPlec, przebieg, uwagi`. Nowe wycielenie podbija laktację, ustawia status Dojna i zakłada cielę w kartotece; zasuszenie ustawia status Zasuszona.
+- `mleko/{krowa}_{data}`: `krowa, data, litry, tluszcz, bialko, scc`.
+- `leczenie/{id}`: `krowa, data, koniec (ostatnie podanie), choroba, lek, dawka, karMleko, karMieso (dni), lekarz, uwagi`. Karencja liczona od `koniec` (albo `data`).
+- `ustawienia/stado`: `tmrLitry, litrNaKg, maxKg, krok, tmr: [{nazwa, kg}]`. Forte Etos na stacji = (mleko − tmrLitry) ÷ litrNaKg, maks. maxKg. Etos podstawa 6 kg/krowę w TMR.
+- Terminy: badanie cielności +35 dni od inseminacji, wycielenie +282, zasuszenie 60 dni przed wycieleniem, ruja co 21 dni, inseminacja od 50 dni po wycieleniu.
+- Reguły Firestore muszą wymieniać nowe kolekcje (wzór w `firestore.rules`). Bez nich pola działają, a zakładki stada pokazują komunikat o braku dostępu.
+
 ## Zasady dziedzinowe (ustalone z użytkownikiem)
 
 - **Sezon** zapisuje się jako rok zbioru (`rok`), a wyświetla jako `rok-1/rok`, np. 2026 → „2025/2026”. Oziminy siane jesienią należą do następnego sezonu.
