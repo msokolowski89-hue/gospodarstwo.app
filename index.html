@@ -724,6 +724,7 @@ function reproTxt(r, k) {
   if (["Cielę", "Byk / opas"].includes(k.status)) return "";
   if (r.cielna === true) return `<span class="pill done">Cielna</span> <span class="sub">ins. ${dPL(r.lastIns.data)}</span>`;
   if (r.cielna === null) return `<span class="pill trwa">Po inseminacji</span> <span class="sub">${dPL(r.lastIns.data)}${r.insCount > 1 ? `, ${r.insCount}. ins.` : ""}</span>`;
+  if (/nie kryć/i.test(k.uwagi || "")) return `<span class="pill" style="background:var(--line);color:var(--ink)">Nie kryć</span>`;
   if (r.cielna === false) return `<span class="pill bad">Niecielna</span>`;
   return `<span class="sub">pusta</span>`;
 }
@@ -738,12 +739,12 @@ function karencja(id) {
 function herdTodo() {
   const t = TODAY(), out = [];
   for (const [id, k] of krowySorted()) {
-    const r = cowRepro(id);
+    const r = cowRepro(id), nieKryc = /nie kryć/i.test(k.uwagi || "");
     if (r.zas && r.cielna !== false && k.status === "Dojna" && !r.dry && r.zas <= addDays(t, 14)) out.push({ d: r.zas, id, txt: "Zasuszyć", cls: "plan" });
     if (r.wyc && r.cielna !== false && r.wyc <= addDays(t, 21) && r.wyc >= addDays(t, -30)) out.push({ d: r.wyc, id, txt: "Przewidywane wycielenie", cls: "trwa" });
     if (r.cielna === null && r.bad <= addDays(t, 3)) out.push({ d: r.bad, id, txt: "Zbadać cielność", cls: "plan" });
-    if (r.nextRuja && Math.abs(dDiff(t, r.nextRuja)) <= 3) out.push({ d: r.nextRuja, id, txt: "Obserwować ruję", cls: "trwa" });
-    if (k.status === "Dojna" && !r.lastIns && r.dim !== null && r.dim >= SPOCZYNEK) out.push({ d: addDays(r.lastCalv, SPOCZYNEK), id, txt: `Do inseminacji (${r.dim} dni po wycieleniu)`, cls: "bad" });
+    if (r.nextRuja && !nieKryc && Math.abs(dDiff(t, r.nextRuja)) <= 3) out.push({ d: r.nextRuja, id, txt: "Obserwować ruję", cls: "trwa" });
+    if (k.status === "Dojna" && !nieKryc && !r.lastIns && r.dim !== null && r.dim >= SPOCZYNEK) out.push({ d: addDays(r.lastCalv, SPOCZYNEK), id, txt: `Do inseminacji (${r.dim} dni po wycieleniu)`, cls: "bad" });
   }
   for (const l of S.leczenie.values()) { const e = lekEnd(l);
     if (e.mleko >= t) out.push({ d: e.mleko, id: l.krowa, txt: `Karencja na mleko do ${dPL(e.mleko)}${l.lek ? " – " + l.lek : ""}`, cls: "bad" });
@@ -1095,14 +1096,16 @@ if (!window.firebase || !window.FIREBASE_CONFIG || !window.FIREBASE_CONFIG.apiKe
     st.hidden = false; st.className = ""; st.textContent = "Wczytywanie danych gospodarstwa…";
     S.loaded = Object.fromEntries(COLS.map(c => [c, false])); S.herdErr = null;
     const timer = setTimeout(() => { st.textContent = "Brak połączenia z bazą. Pokazuję dane zapisane na tym urządzeniu; zmiany wyślą się po odzyskaniu zasięgu."; st.className = "bad"; }, 10000);
-    for (const col of COLS) {
+    const listen = col => {
       unsubs.push(db.collection(col).onSnapshot({ includeMetadataChanges: true }, snap => {
+        if (HERD_COLS.includes(col) && S.herdErr && !snap.metadata.fromCache) S.herdErr = null;
         const m = new Map(); snap.docs.forEach(d => m.set(d.id, d.data()));
         S[col] = m; if (!snap.metadata.fromCache) S.loaded[col] = true;
         if (Object.values(S.loaded).every(Boolean)) { clearTimeout(timer); st.textContent = ""; st.className = ""; st.hidden = true; }
         if (!drawerState) render();
       }, err => {
         if (HERD_COLS.includes(col)) { S.herdErr = err.code; S.loaded[col] = true;   // stado bez reguł nie blokuje pól
+          setTimeout(() => { if (AUTH.user === u) listen(col); }, 30000);   // reguły mogą się jeszcze rozchodzić: ponów za 30 s
           if (Object.values(S.loaded).every(Boolean)) { clearTimeout(timer); st.hidden = true; }
           if (!drawerState) render(); return; }
         clearTimeout(timer); st.hidden = false; st.className = "bad";
@@ -1110,7 +1113,8 @@ if (!window.firebase || !window.FIREBASE_CONFIG || !window.FIREBASE_CONFIG.apiKe
           ? `Konto ${u.email} nie ma dostępu do danych. Dodaj ten adres w regułach Firestore (plik firestore.rules) albo zaloguj się innym kontem.`
           : "Nie można wczytać danych (" + err.code + "). Odśwież stronę później.";
       }));
-    }
+    };
+    COLS.forEach(listen);
   });
   document.addEventListener("click", async e => {
     const el = e.target.closest("[data-act]"); if (!el) return;

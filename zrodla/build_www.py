@@ -42,14 +42,16 @@ if (!window.firebase || !window.FIREBASE_CONFIG || !window.FIREBASE_CONFIG.apiKe
     st.hidden = false; st.className = ""; st.textContent = "Wczytywanie danych gospodarstwa…";
     S.loaded = Object.fromEntries(COLS.map(c => [c, false])); S.herdErr = null;
     const timer = setTimeout(() => { st.textContent = "Brak połączenia z bazą. Pokazuję dane zapisane na tym urządzeniu; zmiany wyślą się po odzyskaniu zasięgu."; st.className = "bad"; }, 10000);
-    for (const col of COLS) {
+    const listen = col => {
       unsubs.push(db.collection(col).onSnapshot({ includeMetadataChanges: true }, snap => {
+        if (HERD_COLS.includes(col) && S.herdErr && !snap.metadata.fromCache) S.herdErr = null;
         const m = new Map(); snap.docs.forEach(d => m.set(d.id, d.data()));
         S[col] = m; if (!snap.metadata.fromCache) S.loaded[col] = true;
         if (Object.values(S.loaded).every(Boolean)) { clearTimeout(timer); st.textContent = ""; st.className = ""; st.hidden = true; }
         if (!drawerState) render();
       }, err => {
         if (HERD_COLS.includes(col)) { S.herdErr = err.code; S.loaded[col] = true;   // stado bez reguł nie blokuje pól
+          setTimeout(() => { if (AUTH.user === u) listen(col); }, 30000);   // reguły mogą się jeszcze rozchodzić: ponów za 30 s
           if (Object.values(S.loaded).every(Boolean)) { clearTimeout(timer); st.hidden = true; }
           if (!drawerState) render(); return; }
         clearTimeout(timer); st.hidden = false; st.className = "bad";
@@ -57,7 +59,8 @@ if (!window.firebase || !window.FIREBASE_CONFIG || !window.FIREBASE_CONFIG.apiKe
           ? `Konto ${u.email} nie ma dostępu do danych. Dodaj ten adres w regułach Firestore (plik firestore.rules) albo zaloguj się innym kontem.`
           : "Nie można wczytać danych (" + err.code + "). Odśwież stronę później.";
       }));
-    }
+    };
+    COLS.forEach(listen);
   });
   document.addEventListener("click", async e => {
     const el = e.target.closest("[data-act]"); if (!el) return;
