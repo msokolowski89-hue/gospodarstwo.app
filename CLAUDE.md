@@ -51,6 +51,7 @@ Parser: `zrodla/import_eagronom.py` (wymaga `xlrd`). Ustalenia:
 ## Wgrane dane (stan na 2026-11-04)
 
 Sezony 2024/2025 (30 upraw, 39 zabiegów), 2025/2026 (34 uprawy, 117 zabiegów) i 2026/2027 (plan plus siew pszenżyta Borowik C2 z 04.11.2026 na 8 polach).
+Stado (2026-11-05) zaimportowane z SOL Zeto (sol.zetosoftware.pl, program oceny użytkowości): 57 krów (51 dojnych, 6 zasuszonych) i 78 jałówek, ostatnie krycia z buhajami (`rozrod/sol-ins-{id}`), stan cielności jako badanie z przybliżoną datą (`rozrod/sol-bad-{id}`), próbny udój z 15.10.2026 (`mleko`). Status rozrodu z SOL jest w `uwagi` („SOL: Nie kryć” wyłącza przypomnienia o kryciu). SOL ma REST `rest/solZwierzeFinderService/fu400WyszukajZwierzeta` (lista KROWY/JALOWKI z datami urodzenia, statusProdukcyjny, wynikami próby).
 Pełna kopia: `~/Documents/gospodarstwo-dane.json`. Plik jest poza repozytorium, bo repozytorium jest publiczne i nie może zawierać danych gospodarstwa.
 Reguły Firestore z adresem użytkownika: `~/Documents/gospodarstwo-reguly-firestore.txt` (w repo jest wzór `firestore.rules`).
 
