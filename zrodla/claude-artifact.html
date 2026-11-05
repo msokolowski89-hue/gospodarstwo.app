@@ -5,29 +5,25 @@
 <style>
 /* Layout: zakładki u góry jak przegródki segregatora polowego; pod nimi jedna robocza tabela na całą szerokość + panel edycji wysuwany z prawej. */
 :root {
-  --bg: #f3f5ef;
+  --bg: #fbfcf8;
   --surface: #ffffff;
-  --ink: #1d2419;
-  --muted: #5d6857;
-  --line: #d9dfd2;
-  --accent: #3d6b2a;       /* zieleń łanu */
+  --ink: #2b3326;
+  --muted: #6f7a68;
+  --line: #e6eadf;
+  --accent: #5a9a3c;       /* zieleń łanu */
   --accent-ink: #ffffff;
-  --soil: #7a5531;         /* brąz gleby */
-  --warn-bg: #fff1c9; --warn-ink: #7a5600;
-  --bad-bg: #ffe0dc; --bad-ink: #9c2414;
-  --ok-bg: #e2f1d8; --ok-ink: #2c5a1a;
-  --c0: #e3efd0; --c1: #fbe7b5; --c2: #d8e7f3; --c3: #f3d9cf; --c4: #e5dcf1; --c5: #d4ece6; --c6: #efe3d2; --c7: #f1d7e4;
-  --chip-ink: #2a2f25;
+  --accent-soft: #e8f4de;
+  --soil: #9a7048;         /* brąz gleby */
+  --warn-bg: #fff6dc; --warn-ink: #8a6500;
+  --bad-bg: #ffecea; --bad-ink: #b0321f;
+  --ok-bg: #edf7e6; --ok-ink: #3a6e24;
+  --c0: #eef6e3; --c1: #fdf2d3; --c2: #e7f1f9; --c3: #f9e8e1; --c4: #efe9f8; --c5: #e3f4ef; --c6: #f6eee3; --c7: #f8e6ef;
+  --chip-ink: #2b3326;
   --f-display: "Archivo", "Arial Narrow", system-ui, sans-serif;
   --f-body: "Source Sans 3", system-ui, -apple-system, "Segoe UI", sans-serif;
   --f-data: "IBM Plex Mono", ui-monospace, Menlo, monospace;
 }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --bg: #141811; --surface: #1c2218; --ink: #e6ebdf; --muted: #9ea896; --line: #2f382a;
-  --accent: #8fc46b; --accent-ink: #11180c; --soil: #d2a273;
-  --warn-bg: #3d3210; --warn-ink: #f3d27a; --bad-bg: #44201a; --bad-ink: #ffb4a6; --ok-bg: #22361a; --ok-ink: #b5e09a;
-  --c0: #2f4223; --c1: #4a3d17; --c2: #1f3546; --c3: #4a2b22; --c4: #352a48; --c5: #1d3f37; --c6: #443624; --c7: #47263a;
-  --chip-ink: #eef2e8; color-scheme: dark } }
+/* Jasny motyw zawsze; ciemny tylko po jawnym ustawieniu data-theme="dark" */
 :root[data-theme="dark"] {
   --bg: #141811; --surface: #1c2218; --ink: #e6ebdf; --muted: #9ea896; --line: #2f382a;
   --accent: #8fc46b; --accent-ink: #11180c; --soil: #d2a273;
@@ -50,10 +46,10 @@ select, input, textarea { font: inherit; color: var(--ink); background: var(--su
 select:focus-visible, input:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible, .cell:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 #rok { font: 700 17px var(--f-data); padding: 6px 10px; }
 
-nav.tabs { display: flex; gap: 2px; overflow-x: auto; border-bottom: 2px solid var(--ink); scrollbar-width: none; }
+nav.tabs { display: flex; gap: 2px; overflow-x: auto; border-bottom: 2px solid var(--accent); scrollbar-width: none; }
 nav.tabs a { flex: none; text-decoration: none; color: var(--muted); font: 700 15px var(--f-display); font-stretch: 85%; text-transform: uppercase; letter-spacing: .04em; padding: 10px 16px 8px; border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0; }
 nav.tabs a:hover { color: var(--ink); }
-nav.tabs a[aria-current="page"] { background: var(--ink); color: var(--bg); }
+nav.tabs a[aria-current="page"] { background: var(--accent); color: var(--accent-ink); }
 
 .stats { display: flex; flex-wrap: wrap; gap: 10px 28px; }
 .stat { display: grid; gap: 0; }
