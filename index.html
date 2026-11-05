@@ -619,10 +619,12 @@ function formZab(id) {
     </div>
     <div class="f"><label for="z-uw">Uwagi</label><textarea id="z-uw" rows="3">${esc(z.uwagi || "")}</textarea></div>`,
   async () => {
-    const rok = parseInt(val("z-rok"), 10); if (!rok) throw "Wybierz sezon.";
+    let rok = parseInt(val("z-rok"), 10); if (!rok) throw "Wybierz sezon.";
     if (!val("z-data")) throw "Wpisz datę zabiegu.";
     const rodzaj = val("z-rodz"); if (!rodzaj) throw "Wybierz rodzaj zabiegu.";
     const sow = isSow(rodzaj, val("z-typ"));
+    // Siew zawsze należy do sezonu wynikającego z daty (od lipca następny sezon), żeby uprawa nie nadpisała poprzedniego sezonu
+    if (sow && /^\d{4}-\d{2}-\d{2}$/.test(val("z-data"))) { const d = val("z-data"), y = +d.slice(0, 4), m = +d.slice(5, 7); rok = m >= 7 ? y + 1 : y; }
     const ros = sow ? readRos() : [];
     if (sow && (!ros.length || ros.some(r => !r.gatunek))) throw "Wpisz gatunek rośliny w każdym wierszu, np. Pszenżyto ozime.";
     const gatunki = [...new Set(ros.map(r => r.gatunek))], odmiany = ros.map(r => r.odmiana).filter(Boolean);
